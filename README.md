@@ -1,6 +1,6 @@
 # Northstar Locate
 
-这是一个独立的响应式单页网站，参考了位置请求类产品的页面结构，当前不连接 Stripe、短信或定位服务。
+这是一个独立的响应式单页网站，参考了位置请求类产品的页面结构，并内置 Stripe Payment Element 付款入口。
 
 ## 本地启动
 
@@ -28,10 +28,20 @@ python server.py
 - 本地演示状态：已创建、等待收件人确认
 - 功能介绍、三步流程、价格卡、隐私说明和 FAQ 折叠
 - 所有输入仅在当前浏览器页面显示，不会发送到外部服务
+- 价格卡通过服务器创建 PaymentIntent，付款表单在本站内嵌显示
+- Payment Element 将持卡人姓名字段设置为不收集，卡片数据由 Stripe iframe 处理
 
 ## 后续接入
 
-付款、短信发送、收件人同意页和真实位置服务应在确认业务流程与合规要求后，再分别接入后端接口。
+短信发送、收件人同意页和真实位置服务仍需单独接入后端接口。
+
+## 配置 Stripe 付款
+
+复制 `.env.example` 为 `.env`，再填写 Stripe 密钥。正式收款使用 `pk_live_` 和 `sk_live_`，测试时使用对应的 `pk_test_` 和 `sk_test_`。私钥只放在 Render 的 Environment Variables 或服务器 `.env`，不要写入前端。
+
+默认价格是单次 `$0.90`、月度 `$19.90`，金额单位为最小货币单位，可通过 `STRIPE_SINGLE_AMOUNT` 和 `STRIPE_MONTHLY_AMOUNT` 修改。修改后要重新部署服务。
+
+付款接口为 `POST /api/create-payment-intent`，请求体只接受 `{ "planId": "single" }` 或 `{ "planId": "monthly" }`，价格由服务器配置决定。
 
 ## 部署到公网（推荐 Render）
 
@@ -55,4 +65,4 @@ python server.py
 
 当前页面只是 UI 演示，真实短信、收件人同意、位置查询、数据库和 Stripe 付款仍未接入。
 
-正式接 Stripe 时，需要在 Render 的 Environment 中配置 live 密钥，设置 `PUBLIC_BASE_URL` 为实际 HTTPS 地址，并在 Stripe 创建指向公网 `/webhook` 的 Webhook。
+正式上线时，在 Render 的 Environment 中配置 live 密钥，设置 `PUBLIC_BASE_URL=https://northstarlocate.com`，并在 Stripe 创建指向 `https://northstarlocate.com/webhook` 的 live Webhook。部署后用真实卡做一笔小额测试，并在 Stripe Payments 中确认状态。

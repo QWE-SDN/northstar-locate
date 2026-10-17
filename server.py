@@ -1,8 +1,7 @@
-"""Small, dependency-light Stripe Checkout Elements demo server.
+"""Small, dependency-light Stripe Payment Element server.
 
-The server creates Checkout Sessions server-side and never sends the Stripe
-secret key to the browser. The browser receives only a Checkout Session
-client secret and the publishable key.
+Stripe secrets stay on the server. The browser receives only the publishable
+key and a short-lived PaymentIntent client secret.
 """
 
 from __future__ import annotations
@@ -67,6 +66,22 @@ def config() -> dict[str, Any]:
         "currency": currency,
         "productName": product_name,
         "priceId": os.environ.get("STRIPE_PRICE_ID", "").strip(),
+        "plans": {
+            "single": {
+                "amount": env_int("STRIPE_SINGLE_AMOUNT", 90),
+                "currency": currency,
+                "productName": os.environ.get(
+                    "STRIPE_SINGLE_PRODUCT_NAME", "Northstar Locate - Single request"
+                ),
+            },
+            "monthly": {
+                "amount": env_int("STRIPE_MONTHLY_AMOUNT", 1990),
+                "currency": currency,
+                "productName": os.environ.get(
+                    "STRIPE_MONTHLY_PRODUCT_NAME", "Northstar Locate - Monthly plan"
+                ),
+            },
+        },
     }
 
 
@@ -152,6 +167,39 @@ def create_checkout_session(
     return {"clientSecret": client_secret, "sessionId": payload.get("id")}
 
 
+def create_payment_intent(
+    plan_id: str,
+    idempotency_key: str | None,
+) -> dict[str, Any]:
+    """Create a server-priced PaymentIntent for one of the published plans."""
+
+    settings = config()
+    plan = settings["plans"].get(plan_id)
+    if not plan:
+        raise StripeAPIError(400, "Unknown payment plan")
+    if not settings["publishableKey"].startswith("pk_"):
+        raise StripeAPIError(500, "STRIPE_PUBLISHABLE_KEY is not configured correctly")
+
+    params = {
+        "amount": str(plan["amount"]),
+        "currency": plan["currency"],
+        "automatic_payment_methods[enabled]": "true",
+        "description": plan["productName"],
+        "metadata[plan_id]": plan_id,
+    }
+    payload = stripe_request("POST", "/payment_intents", params, idempotency_key)
+    client_secret = payload.get("client_secret")
+    if not client_secret:
+        raise StripeAPIError(502, "Stripe did not return a PaymentIntent client secret")
+    return {
+        "clientSecret": client_secret,
+        "paymentIntentId": payload.get("id"),
+        "amount": plan["amount"],
+        "currency": plan["currency"],
+        "productName": plan["productName"],
+    }
+
+
 def verify_webhook_signature(payload: bytes, signature: str, secret: str) -> bool:
     values: dict[str, list[str]] = {}
     for item in signature.split(","):
@@ -233,8 +281,28 @@ class Handler(BaseHTTPRequestHandler):
                     "currency": settings["currency"],
                     "productName": settings["productName"],
                     "priceId": settings["priceId"],
+                    "plans": settings["plans"],
                 },
             )
+            return
+
+        if parsed.path == "/api/payment-intent-status":
+            payment_intent_id = parse_qs(parsed.query).get("payment_intent_id", [""])[0]
+            if not re.fullmatch(r"pi_[A-Za-z0-9_]+", payment_intent_id):
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": "invalid payment_intent_id"})
+                return
+            try:
+                payment_intent = stripe_request("GET", f"/payment_intents/{payment_intent_id}")
+                self.send_json(
+                    HTTPStatus.OK,
+                    {
+                        "status": payment_intent.get("status"),
+                        "amount": payment_intent.get("amount"),
+                        "currency": payment_intent.get("currency"),
+                    },
+                )
+            except StripeAPIError as exc:
+                self.send_json(exc.status, {"error": exc.message})
             return
 
         if parsed.path == "/api/session-status":
@@ -279,6 +347,21 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path == "/api/create-payment-intent":
+            try:
+                body = self.read_json()
+                plan_id = str(body.get("planId", "")).strip()
+                result = create_payment_intent(
+                    plan_id,
+                    self.headers.get("Idempotency-Key"),
+                )
+                self.send_json(HTTPStatus.OK, result)
+            except (ValueError, json.JSONDecodeError) as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            except StripeAPIError as exc:
+                self.send_json(exc.status, {"error": exc.message})
+            return
+
         if parsed.path == "/api/create-checkout-session":
             try:
                 self.read_json()
@@ -318,7 +401,7 @@ def main() -> None:
     port = int(os.environ.get("PORT", "4243"))
     server = ThreadingHTTPServer((host, port), Handler)
     print(f"Northstar Locate site listening at http://{host}:{port}")
-    print("Payment integration is reserved for a later step; the current page is a local UI demo.")
+    print("Stripe Payment Element endpoints are ready; configure Stripe keys before accepting payments.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

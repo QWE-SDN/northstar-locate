@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Northstar Locate：发送经过同意的手机位置请求。">
+    <title>Northstar Locate | 找到方向</title>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #14234a;
+        --muted: #66728b;
+        --blue: #2f68f5;
+        --blue-dark: #1e4fca;
+        --sky: #eef8ff;
+        --paper: #f8fcff;
+        --line: #d9e4ef;
+        --mint: #dff8ef;
+        --coral: #ff7d69;
+        font-family: Inter, "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+        background: var(--paper);
+        color: var(--ink);
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; min-width: 320px; background: var(--paper); }
+      a { color: inherit; text-decoration: none; }
+      button, input, select { font: inherit; }
+      .shell { width: min(1160px, calc(100% - 40px)); margin: 0 auto; }
+      .site-header { display: flex; align-items: center; justify-content: space-between; min-height: 78px; gap: 20px; }
+      .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); font-size: 20px; font-weight: 800; letter-spacing: -.03em; }
+      .brand-mark { position: relative; width: 31px; height: 31px; display: grid; place-items: center; border-radius: 50% 50% 50% 12px; background: var(--blue); color: #fff; transform: rotate(-45deg); box-shadow: 0 7px 15px rgb(47 104 245 / 22%); }
+      .brand-mark::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: #fff; }
+      .brand-name { transform: translateY(1px); }
+      .nav { display: flex; align-items: center; gap: 28px; color: var(--muted); font-size: 14px; }
+      .nav a:hover { color: var(--blue); }
+      .language { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff; font-size: 13px; }
+      .flag { font-size: 16px; }
+      .menu-toggle { display: none; width: 40px; height: 40px; border: 0; background: transparent; color: var(--ink); cursor: pointer; font-size: 24px; }
+      .hero { display: grid; grid-template-columns: minmax(0, 1.04fr) minmax(350px, .96fr); align-items: center; gap: 74px; padding: 88px 0 72px; }
+      .hero > * { min-width: 0; }
+      .eyebrow { margin: 0 0 15px; color: var(--blue); font-size: 12px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
+      h1 { max-width: 620px; margin: 0; color: var(--ink); font-size: clamp(42px, 5.2vw, 68px); line-height: 1.04; letter-spacing: -.06em; }
+      .hero-copy { max-width: 520px; margin: 23px 0 0; color: var(--muted); font-size: 17px; line-height: 1.7; }
+      .lookup-form { display: flex; align-items: stretch; width: 100%; max-width: 570px; margin-top: 28px; padding: 7px; background: #fff; border: 1px solid #d9e4f0; border-radius: 9px; box-shadow: 0 14px 30px rgb(33 80 143 / 11%); }
+      .lookup-form select { width: 114px; border: 0; border-right: 1px solid var(--line); outline: 0; background: #fff; color: var(--ink); padding: 0 8px; cursor: pointer; }
+      .lookup-form input { min-width: 0; flex: 1; border: 0; outline: 0; background: #fff; padding: 12px 14px; color: var(--ink); }
+      .lookup-form input::placeholder { color: #99a5b8; }
+      .lookup-form button { width: 54px; border: 0; border-radius: 7px; background: var(--blue); color: #fff; font-size: 24px; cursor: pointer; transition: background .18s ease, transform .18s ease; }
+      .lookup-form button:hover { background: var(--blue-dark); transform: translateX(1px); }
+      .form-note { margin: 13px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+      .result { display: none; max-width: 570px; margin-top: 15px; padding: 15px 17px; border: 1px solid #bfe9d9; border-radius: 8px; background: var(--mint); color: #17654f; font-size: 14px; line-height: 1.55; }
+      .result.show { display: block; }
+      .result strong { display: block; margin-bottom: 3px; }
+      .hero-visual { position: relative; min-height: 430px; }
+      .visual-frame { position: relative; overflow: hidden; height: 430px; border-radius: 14px; background: #dceeff; box-shadow: 0 25px 50px rgb(31 77 137 / 17%); }
+      .visual-frame img { width: 100%; height: 100%; display: block; object-fit: cover; filter: saturate(.77) brightness(1.04); }
+      .visual-frame::after { content: ""; position: absolute; inset: 0; background: linear-gradient(145deg, rgb(41 108 219 / 5%), rgb(20 52 116 / 42%)); pointer-events: none; }
+      .status-card { position: absolute; left: -28px; bottom: 28px; z-index: 1; width: 255px; padding: 17px; border: 1px solid rgb(255 255 255 / 65%); border-radius: 10px; background: rgb(255 255 255 / 94%); box-shadow: 0 14px 32px rgb(17 43 91 / 20%); backdrop-filter: blur(10px); }
+      .status-top { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 11px; }
+      .online { display: inline-flex; align-items: center; gap: 5px; color: #248564; }
+      .online::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #36ba83; }
+      .status-card h3 { margin: 14px 0 12px; font-size: 18px; letter-spacing: -.02em; }
+      .status-bar { height: 7px; border-radius: 99px; background: #e7edf5; overflow: hidden; }
+      .status-bar span { display: block; width: 78%; height: 100%; border-radius: inherit; background: var(--blue); }
+      .status-meta { display: flex; justify-content: space-between; margin-top: 9px; color: var(--muted); font-size: 11px; }
+      .trust-strip { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 19px 0; }
+      .trust-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; color: var(--muted); font-size: 13px; }
+      .trust-items { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+      .trust-item { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-weight: 700; }
+      .trust-icon { width: 23px; height: 23px; display: grid; place-items: center; border: 1px solid #bfd1e7; border-radius: 6px; color: var(--blue); font-size: 12px; }
+      section { padding: 88px 0; }
+      .section-heading { max-width: 680px; margin: 0 auto 36px; text-align: center; }
+      h2 { margin: 0; font-size: clamp(31px, 4vw, 46px); line-height: 1.08; letter-spacing: -.05em; }
+      .section-heading p:not(.eyebrow) { margin: 16px auto 0; color: var(--muted); line-height: 1.65; }
+      .benefit-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 17px; }
+      .benefit-card { padding: 25px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }
+      .benefit-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; background: #eaf2ff; color: var(--blue); font-size: 20px; }
+      .benefit-card h3 { margin: 28px 0 9px; font-size: 19px; }
+      .benefit-card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
+      .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+      .step { position: relative; padding: 28px 25px; border-radius: 9px; background: #edf7ff; }
+      .step-number { color: var(--coral); font-size: 12px; font-weight: 800; letter-spacing: .1em; }
+      .step h3 { margin: 36px 0 8px; font-size: 20px; }
+      .step p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
+      .pricing { display: grid; grid-template-columns: repeat(2, minmax(0, 350px)); justify-content: center; gap: 18px; }
+      .price-card { position: relative; padding: 28px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+      .price-card.featured { border: 2px solid var(--blue); box-shadow: 0 17px 35px rgb(47 104 245 / 12%); }
+      .price-badge { position: absolute; top: -12px; left: 22px; padding: 4px 10px; border-radius: 99px; background: var(--blue); color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .05em; }
+      .price-card h3 { margin: 0; font-size: 18px; }
+      .price { margin: 21px 0 7px; color: var(--ink); font-size: 41px; font-weight: 800; letter-spacing: -.06em; }
+      .price small { color: var(--muted); font-size: 13px; font-weight: 500; letter-spacing: 0; }
+      .price-copy { min-height: 43px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+      .plan-list { display: grid; gap: 11px; margin: 23px 0 26px; padding: 0; list-style: none; color: var(--muted); font-size: 13px; }
+      .plan-list li::before { content: "✓"; margin-right: 8px; color: #2a9a75; font-weight: 800; }
+      .plan-button { width: 100%; border: 1px solid var(--blue); border-radius: 6px; padding: 12px 14px; background: #fff; color: var(--blue); font-weight: 750; cursor: pointer; }
+      .featured .plan-button { background: var(--blue); color: #fff; }
+      .plan-button:hover { background: #eaf2ff; }
+      .featured .plan-button:hover { background: var(--blue-dark); }
+      .faq-list { max-width: 850px; margin: 0 auto; }
+      details { border-top: 1px solid var(--line); padding: 19px 0; }
+      details:last-child { border-bottom: 1px solid var(--line); }
+      summary { cursor: pointer; list-style: none; color: var(--ink); font-weight: 700; }
+      summary::-webkit-details-marker { display: none; }
+      summary::after { content: "+"; float: right; color: var(--blue); font-size: 22px; font-weight: 400; }
+      details[open] summary::after { content: "−"; }
+      details p { max-width: 720px; margin: 12px 0 0; color: var(--muted); line-height: 1.7; font-size: 14px; }
+      .consent-band { display: grid; grid-template-columns: 1.2fr .8fr; align-items: center; gap: 36px; padding: 34px 40px; border-radius: 11px; background: var(--ink); color: #fff; }
+      .consent-band h2 { font-size: clamp(27px, 3vw, 37px); }
+      .consent-band p { margin: 13px 0 0; color: rgb(255 255 255 / 72%); line-height: 1.6; }
+      .consent-box { padding: 19px; border: 1px solid rgb(255 255 255 / 22%); border-radius: 8px; color: rgb(255 255 255 / 85%); font-size: 13px; line-height: 1.6; }
+      .consent-box strong { display: block; margin-bottom: 5px; color: #fff; }
+      footer { border-top: 1px solid var(--line); padding: 31px 0 40px; color: var(--muted); font-size: 12px; }
+      .footer-inner { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; }
+      .footer-links { display: flex; gap: 24px; flex-wrap: wrap; }
+      .footer-links a:hover { color: var(--blue); }
+      .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+      .payment-modal { position: fixed; inset: 0; z-index: 20; display: none; place-items: center; padding: 20px; background: rgb(20 35 74 / 48%); }
+      .payment-modal.open { display: grid; }
+      .payment-dialog { width: min(100%, 560px); max-height: min(760px, calc(100vh - 40px)); overflow: auto; padding: 28px; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: 0 24px 70px rgb(20 35 74 / 30%); }
+      .payment-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; }
+      .payment-header h2 { margin: 0; color: var(--ink); font-size: 28px; letter-spacing: -.04em; }
+      .payment-header p:last-child { margin: 9px 0 0; color: var(--muted); font-size: 14px; }
+      .payment-close { width: 36px; height: 36px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--ink); font-size: 24px; line-height: 1; cursor: pointer; }
+      .payment-close:hover { background: var(--sky); }
+      .payment-loading { margin-top: 24px; padding: 19px; border-radius: 8px; background: var(--sky); color: var(--muted); font-size: 14px; }
+      #payment-form { margin-top: 24px; }
+      #payment-element { min-height: 120px; }
+      .payment-submit { width: 100%; margin-top: 22px; border: 0; border-radius: 7px; padding: 14px 16px; background: var(--blue); color: #fff; font-weight: 800; cursor: pointer; }
+      .payment-submit:hover { background: var(--blue-dark); }
+      .payment-submit:disabled { cursor: wait; opacity: .65; }
+      .payment-error { min-height: 20px; margin: 12px 0 0; color: #b42318; font-size: 13px; line-height: 1.5; }
+      body.modal-open { overflow: hidden; }
+      @media (max-width: 850px) { .hero { grid-template-columns: 1fr; gap: 43px; padding-top: 55px; } .hero-visual { min-height: 360px; } .visual-frame { height: 360px; } .status-card { left: 14px; } .benefit-grid,.steps { grid-template-columns: 1fr; } .consent-band { grid-template-columns: 1fr; } }
+      @media (max-width: 620px) { .shell { width: min(100% - 28px, 1160px); } .site-header { min-height: 68px; } .nav { display: none; position: absolute; top: 68px; left: 14px; right: 14px; z-index: 4; flex-direction: column; align-items: stretch; gap: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: 0 15px 30px rgb(20 35 74 / 14%); } .nav.open { display: flex; } .nav a,.nav .language { padding: 12px 10px; } .menu-toggle { display: block; } .hero { padding: 44px 0 58px; } h1 { font-size: 45px; } .hero-copy { font-size: 16px; } .lookup-form { padding: 5px; } .lookup-form select { width: 98px; font-size: 13px; } .lookup-form input { padding: 11px 9px; font-size: 14px; } .hero-visual,.visual-frame { min-height: 290px; height: 290px; } .status-card { width: 235px; bottom: 15px; } .trust-inner,.footer-inner { align-items: flex-start; flex-direction: column; } section { padding: 70px 0; } .pricing { grid-template-columns: 1fr; } .consent-band { padding: 28px 22px; } }
+    </style>
+  </head>
+  <body>
+    <header class="shell site-header">
+      <a class="brand" href="#top" aria-label="Northstar Locate 首页"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Northstar Locate</span></a>
+      <button class="menu-toggle" type="button" aria-label="打开菜单" aria-expanded="false">☰</button>
+      <nav class="nav" aria-label="主导航">
+        <a href="#how-it-works">工作原理</a>
+        <a href="#pricing">价格</a>
+        <a href="#faq">常见问题</a>
+        <span class="language"><span class="flag">🇭🇰</span> 中文</span>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="shell hero">
+        <div>
+          <p class="eyebrow">Northstar Locate / find the next step</p>
+          <h1>找到手机的位置。</h1>
+          <p class="hero-copy">输入号码，创建一份清晰的位置请求。收件人确认后，你才能看到后续结果。</p>
+          <form class="lookup-form" id="lookup-form">
+            <label class="sr-only" for="country">国家或地区</label>
+            <select id="country" name="country" aria-label="国家或地区">
+              <option value="+852">🇭🇰 +852</option>
+              <option value="+86">🇨🇳 +86</option>
+              <option value="+1">🇺🇸 +1</option>
+              <option value="+44">🇬🇧 +44</option>
+              <option value="+61">🇦🇺 +61</option>
+            </select>
+            <label class="sr-only" for="phone">手机号码</label>
+            <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="输入要查找的号码" required>
+            <button type="submit" aria-label="创建位置请求">&#8594;</button>
+          </form>
+          <p class="form-note">我们只会创建请求，不会在对方不知情的情况下获取位置。</p>
+          <div class="result" id="request-result" role="status" aria-live="polite"><strong>请求已准备好</strong><span id="result-copy"></span></div>
+        </div>
+        <div class="hero-visual" aria-label="Northstar Locate 工作区预览">
+          <div class="visual-frame"><img src="/assets/hero-city.jpg" alt="城市地图与道路的俯瞰图"></div>
+          <div class="status-card"><div class="status-top"><span>位置请求</span><span class="online">在线</span></div><h3>等待对方确认</h3><div class="status-bar"><span></span></div><div class="status-meta"><span>隐私保护</span><strong>100%</strong></div></div>
+        </div>
+      </section>
+
+      <div class="trust-strip"><div class="shell trust-inner"><span>一个更清楚、更尊重隐私的位置请求工具。</span><div class="trust-items"><span class="trust-item"><span class="trust-icon">✓</span>安全连接</span><span class="trust-item"><span class="trust-icon">◈</span>明确同意</span><span class="trust-item"><span class="trust-icon">◎</span>全球号码</span></div></div></div>
+
+      <section class="shell" id="features">
+        <div class="section-heading"><p class="eyebrow">简单、透明、可控</p><h2>让每一次请求都有清楚的边界。</h2><p>Northstar Locate 用简单的流程整理位置请求，重要的是让收件人知道发生了什么。</p></div>
+        <div class="benefit-grid">
+          <article class="benefit-card"><div class="benefit-icon">⌖</div><h3>覆盖常见网络</h3><p>支持多种国家和地区号码格式，先校验输入，再开始请求流程。</p></article>
+          <article class="benefit-card"><div class="benefit-icon">▣</div><h3>收件人确认</h3><p>位置结果只在对方明确同意后继续，避免不透明的静默追踪。</p></article>
+          <article class="benefit-card"><div class="benefit-icon">◌</div><h3>清楚的状态</h3><p>从已创建、等待确认到已完成，每一步都用容易理解的状态展示。</p></article>
+        </div>
+      </section>
+
+      <section class="shell" id="how-it-works">
+        <div class="section-heading"><p class="eyebrow">工作原理</p><h2>三步完成一次位置请求。</h2><p>从号码开始，到收件人授权结束，流程保持简单。</p></div>
+        <div class="steps"><article class="step"><span class="step-number">01 / 请求</span><h3>输入号码</h3><p>选择国家或地区，输入要联系的手机号码。</p></article><article class="step"><span class="step-number">02 / 同意</span><h3>收件人确认</h3><p>收件人会看到请求说明，并自行选择是否同意。</p></article><article class="step"><span class="step-number">03 / 结果</span><h3>查看状态</h3><p>收到确认后，回到工作区查看请求状态和后续结果。</p></article></div>
+      </section>
+
+      <section class="shell" id="pricing">
+        <div class="section-heading"><p class="eyebrow">价格</p><h2>先从适合你的方式开始。</h2><p>选择方案后，付款表单会直接在本网站内打开，卡片信息由 Stripe 安全处理。</p></div>
+        <div class="pricing"><article class="price-card featured"><span class="price-badge">推荐</span><h3>单次请求</h3><div class="price">$0.90 <small>/ 次</small></div><p class="price-copy">适合偶尔需要创建位置请求的用户。</p><ul class="plan-list"><li>一次位置请求</li><li>清晰的状态追踪</li><li>同意后继续</li><li>移动端可用</li></ul><button class="plan-button" type="button" data-plan="single">立即付款</button></article><article class="price-card"><h3>月度方案</h3><div class="price">$19.90 <small>/ 月</small></div><p class="price-copy">适合需要持续使用请求工作区的用户。</p><ul class="plan-list"><li>更多请求额度</li><li>请求历史记录</li><li>统一工作区</li><li>随时取消</li></ul><button class="plan-button" type="button" data-plan="monthly">选择月度方案</button></article></div>
+      </section>
+
+      <section class="shell"><div class="consent-band"><div><p class="eyebrow">隐私优先</p><h2>不隐藏过程，也不替别人做决定。</h2><p>真实的位置服务必须建立在收件人知情和同意的基础上。Northstar Locate 的页面和后续接口都会把这一步放在核心流程里。</p></div><div class="consent-box"><strong>请求状态示例</strong>已创建 → 等待确认 → 对方同意 → 显示可用结果</div></div></section>
+
+      <section class="shell" id="faq"><div class="section-heading"><p class="eyebrow">常见问题</p><h2>你可能想先了解这些。</h2></div><div class="faq-list"><details open><summary>只输入电话号码就能直接看到位置吗？</summary><p>不能。号码只能用来创建请求，收件人需要看到说明并主动同意，之后系统才会继续。</p></details><details><summary>支持哪些手机？</summary><p>页面支持常见国家和地区的手机号码格式，真正的短信和位置服务接口将在后续接入后决定实际覆盖范围。</p></details><details><summary>收件人会知道这是位置请求吗？</summary><p>会。正式版本应明确说明请求目的、有效时间和可选的同意或拒绝操作。</p></details><details><summary>付款功能现在可以使用吗？</summary><p>选择价格方案后，Stripe Payment Element 会在本网站内打开，付款由 Stripe 处理。</p></details><details><summary>我的输入会保存吗？</summary><p>当前演示只在浏览器本地显示请求状态，不会把号码发送到外部服务。</p></details></div></section>
+    </main>
+
+    <footer><div class="shell footer-inner"><a class="brand" href="#top"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Northstar Locate</span></a><div class="footer-links"><a href="#how-it-works">工作原理</a><a href="#pricing">价格</a><a href="#faq">常见问题</a><a href="#top">隐私政策</a><a href="#top">服务条款</a></div><span>© 2026 Northstar Locate</span></div></footer>
+
+    <div class="payment-modal" id="payment-modal" aria-hidden="true">
+      <div class="payment-dialog" role="dialog" aria-modal="true" aria-labelledby="payment-title">
+        <div class="payment-header">
+          <div>
+            <p class="eyebrow">Stripe 安全付款</p>
+            <h2 id="payment-title">准备付款</h2>
+            <p id="payment-summary">付款信息将在此处加载。</p>
+          </div>
+          <button class="payment-close" id="payment-close" type="button" aria-label="关闭付款窗口">×</button>
+        </div>
+        <div class="payment-loading" id="payment-loading">正在准备安全付款表单…</div>
+        <form id="payment-form" hidden>
+          <div id="payment-element"></div>
+          <button class="payment-submit" id="payment-submit" type="submit">确认付款</button>
+          <div class="payment-error" id="payment-error" role="alert" aria-live="polite"></div>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      const menuToggle = document.querySelector('.menu-toggle');
+      const nav = document.querySelector('.nav');
+      const lookupForm = document.querySelector('#lookup-form');
+      const country = document.querySelector('#country');
+      const phone = document.querySelector('#phone');
+      const result = document.querySelector('#request-result');
+      const resultCopy = document.querySelector('#result-copy');
+
+      menuToggle.addEventListener('click', () => {
+        const open = nav.classList.toggle('open');
+        menuToggle.setAttribute('aria-expanded', String(open));
+      });
+
+      lookupForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const digits = phone.value.replace(/[^0-9]/g, '');
+        if (digits.length < 6) {
+          result.classList.add('show');
+          result.querySelector('strong').textContent = '请检查号码';
+          resultCopy.textContent = '请输入至少 6 位数字，再创建位置请求。';
+          return;
+        }
+        const masked = digits.length > 4 ? `${digits.slice(0, 2)}••••${digits.slice(-2)}` : digits;
+        result.classList.add('show');
+        result.querySelector('strong').textContent = '请求已准备好';
+        resultCopy.textContent = `${country.value} ${masked} 的请求已在本页生成。下一步需要接入短信和收件人同意服务。`;
+        result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+
+      const paymentModal = document.querySelector('#payment-modal');
+      const paymentClose = document.querySelector('#payment-close');
+      const paymentLoading = document.querySelector('#payment-loading');
+      const paymentForm = document.querySelector('#payment-form');
+      const paymentSummary = document.querySelector('#payment-summary');
+      const paymentSubmit = document.querySelector('#payment-submit');
+      const paymentError = document.querySelector('#payment-error');
+      let stripe;
+      let elements;
+      let paymentElement;
+
+      function closePaymentModal() {
+        paymentModal.classList.remove('open');
+        paymentModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('modal-open');
+        paymentError.textContent = '';
+      }
+
+      function money(amount, currency) {
+        return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency.toUpperCase() }).format(amount / 100);
+      }
+
+      async function openPayment(planId) {
+        paymentModal.classList.add('open');
+        paymentModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+        paymentLoading.hidden = false;
+        paymentForm.hidden = true;
+        paymentError.textContent = '';
+        if (paymentElement) {
+          paymentElement.unmount();
+          paymentElement = null;
+        }
+        paymentSummary.textContent = '正在连接 Stripe…';
+        try {
+          const configResponse = await fetch('/api/config', { cache: 'no-store' });
+          const siteConfig = await configResponse.json();
+          if (!configResponse.ok || !siteConfig.publishableKey) throw new Error('付款暂时不可用，请稍后再试。');
+          const plan = siteConfig.plans && siteConfig.plans[planId];
+          if (!plan) throw new Error('未找到该付款方案。');
+          paymentSummary.textContent = `${plan.productName} · ${money(plan.amount, plan.currency)}`;
+          stripe = stripe || Stripe(siteConfig.publishableKey);
+          const intentResponse = await fetch('/api/create-payment-intent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Idempotency-Key': `northstar-${planId}-${crypto.randomUUID()}` },
+            body: JSON.stringify({ planId }),
+          });
+          const intent = await intentResponse.json();
+          if (!intentResponse.ok) throw new Error(intent.error || '无法创建付款。');
+          elements = stripe.elements({ clientSecret: intent.clientSecret, appearance: { theme: 'stripe' } });
+          paymentElement = elements.create('payment', {
+            fields: { billingDetails: { name: 'never' } },
+          });
+          paymentElement.mount('#payment-element');
+          paymentLoading.hidden = true;
+          paymentForm.hidden = false;
+        } catch (error) {
+          paymentLoading.textContent = error.message || '付款初始化失败。';
+        }
+      }
+
+      document.querySelectorAll('[data-plan]').forEach((button) => button.addEventListener('click', () => openPayment(button.dataset.plan)));
+      paymentClose.addEventListener('click', closePaymentModal);
+      paymentModal.addEventListener('click', (event) => { if (event.target === paymentModal) closePaymentModal(); });
+      document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && paymentModal.classList.contains('open')) closePaymentModal(); });
+      paymentForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!stripe || !elements) return;
+        paymentSubmit.disabled = true;
+        paymentSubmit.textContent = '正在处理…';
+        paymentError.textContent = '';
+        const { error } = await stripe.confirmPayment({
+          elements,
+          confirmParams: { return_url: `${window.location.origin}/return.html` },
+        });
+        if (error) paymentError.textContent = error.message || '付款未完成，请检查信息后重试。';
+        paymentSubmit.disabled = false;
+        paymentSubmit.textContent = '确认付款';
+      });
+
+      document.querySelectorAll('.nav a').forEach((link) => link.addEventListener('click', () => {
+        nav.classList.remove('open');
+        menuToggle.setAttribute('aria-expanded', 'false');
+      }));
+    </script>
+  </body>
+</html>
