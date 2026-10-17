@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Payment status</title>
+    <style>
+      :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #182230; background: #f6f8fb; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+      main { width: min(100%, 520px); background: #fff; border: 1px solid #dce2ea; border-radius: 8px; padding: 28px; }
+      #status { line-height: 1.5; }
+      .success { color: #147a4b; }
+      .error { color: #b42318; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Payment status</h1>
+      <p id="status">Checking payment status...</p>
+    </main>
+    <script>
+      const statusNode = document.querySelector('#status');
+      const sessionId = new URLSearchParams(window.location.search).get('session_id');
+
+      async function loadStatus() {
+        if (!sessionId) {
+          statusNode.textContent = 'Missing Checkout Session ID.';
+          statusNode.className = 'error';
+          return;
+        }
+        try {
+          const response = await fetch(`/api/session-status?session_id=${encodeURIComponent(sessionId)}`);
+          const body = await response.json();
+          if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
+          if (body.paymentStatus === 'paid') {
+            statusNode.textContent = 'Payment received. Thank you.';
+            statusNode.className = 'success';
+          } else {
+            statusNode.textContent = `Payment status: ${body.paymentStatus || body.status || 'pending'}.`;
+          }
+        } catch (error) {
+          statusNode.textContent = error.message;
+          statusNode.className = 'error';
+        }
+      }
+
+      loadStatus();
+    </script>
+  </body>
+</html>
