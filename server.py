@@ -67,18 +67,18 @@ def config() -> dict[str, Any]:
         "productName": product_name,
         "priceId": os.environ.get("STRIPE_PRICE_ID", "").strip(),
         "plans": {
-            "single": {
-                "amount": env_int("STRIPE_SINGLE_AMOUNT", 90),
-                "currency": currency,
-                "productName": os.environ.get(
-                    "STRIPE_SINGLE_PRODUCT_NAME", "Northstar Locate - Single request"
-                ),
-            },
             "monthly": {
-                "amount": env_int("STRIPE_MONTHLY_AMOUNT", 1990),
+                "amount": env_int("STRIPE_MONTHLY_AMOUNT", 9900),
                 "currency": currency,
                 "productName": os.environ.get(
                     "STRIPE_MONTHLY_PRODUCT_NAME", "Northstar Locate - Monthly plan"
+                ),
+            },
+            "yearly": {
+                "amount": env_int("STRIPE_YEARLY_AMOUNT", 19900),
+                "currency": currency,
+                "productName": os.environ.get(
+                    "STRIPE_YEARLY_PRODUCT_NAME", "Northstar Locate - Yearly plan"
                 ),
             },
         },
