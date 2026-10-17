@@ -319,20 +319,44 @@
       paymentModal.addEventListener('click', (event) => { if (event.target === paymentModal) closePaymentModal(); });
       document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && paymentModal.classList.contains('open')) closePaymentModal(); });
       paymentForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        if (!stripe || !elements) return;
-        paymentSubmit.disabled = true;
-        paymentSubmit.textContent = '正在处理…';
-        paymentError.textContent = '';
-        const { error } = await stripe.confirmPayment({
-          elements,
-          confirmParams: { return_url: `${window.location.origin}/return.html` },
-        });
-        if (error) paymentError.textContent = error.message || '付款未完成，请检查信息后重试。';
-        paymentSubmit.disabled = false;
-        paymentSubmit.textContent = '确认付款';
-      });
+  event.preventDefault();
+  if (!stripe || !elements) return;
 
+  paymentSubmit.disabled = true;
+  paymentSubmit.textContent = '正在处理…';
+  paymentError.textContent = '';
+
+  try {
+    const result = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/return.html`,
+        payment_method_data: {
+          billing_details: { name: 'N/A' },
+        },
+      },
+      redirect: 'if_required',
+    });
+
+    if (result.error) {
+      paymentError.textContent =
+        result.error.message || '付款未完成，请检查信息后重试。';
+    } else if (result.paymentIntent?.status === 'succeeded') {
+      paymentError.textContent = '付款成功。';
+    } else if (result.paymentIntent?.status === 'processing') {
+      paymentError.textContent = '付款正在确认中，请稍候查看状态。';
+    } else {
+      paymentError.textContent =
+        `付款状态：${result.paymentIntent?.status || '未完成'}。`;
+    }
+  } catch (error) {
+    console.error('Stripe confirmPayment failed', error);
+    paymentError.textContent = '支付处理出现问题，请重试。';
+  } finally {
+    paymentSubmit.disabled = false;
+    paymentSubmit.textContent = '确认付款';
+  }
+});
       document.querySelectorAll('.nav a').forEach((link) => link.addEventListener('click', () => {
         nav.classList.remove('open');
         menuToggle.setAttribute('aria-expanded', 'false');
