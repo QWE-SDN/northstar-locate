@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import ipaddress
 import json
 import os
 import re
@@ -21,7 +22,9 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 
 ROOT = Path(__file__).resolve().parent
@@ -29,6 +32,9 @@ PUBLIC_DIR = ROOT / "public"
 SESSION_TTL = 30 * 24 * 60 * 60
 PASSWORD_ITERATIONS = 310_000
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+VERIFICATION_TTL = 10 * 60
+VERIFICATION_COOLDOWN = 60
+VERIFICATION_MAX_ATTEMPTS = 5
 
 
 def load_dotenv(path: Path) -> None:
@@ -93,8 +99,31 @@ def init_db() -> None:
                 created_at INTEGER NOT NULL
             );
             CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires_at);
+            CREATE TABLE IF NOT EXISTS email_verifications (
+                token_hash TEXT PRIMARY KEY,
+                email TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                code_hash TEXT NOT NULL,
+                expires_at INTEGER NOT NULL,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                ready INTEGER NOT NULL DEFAULT 0,
+                sent_at INTEGER NOT NULL,
+                created_at INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS email_verifications_email_idx
+                ON email_verifications(email);
+            CREATE TABLE IF NOT EXISTS email_send_attempts (
+                email TEXT NOT NULL,
+                requester_hash TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS email_send_attempts_time_idx
+                ON email_send_attempts(created_at);
             """
         )
+        columns = {row["name"] for row in db.execute("PRAGMA table_info(users)")}
+        if "email_verified_at" not in columns:
+            db.execute("ALTER TABLE users ADD COLUMN email_verified_at INTEGER")
 
 
 def now() -> int:
@@ -136,6 +165,7 @@ def safe_user(row: sqlite3.Row | None) -> dict[str, Any] | None:
         "email": row["email"],
         "subscriptionPlan": row["subscription_plan"],
         "subscriptionStatus": row["subscription_status"],
+        "emailVerified": row["email_verified_at"] is not None,
     }
 
 
@@ -202,7 +232,163 @@ def plan_config() -> dict[str, dict[str, Any]]:
 
 
 def app_config() -> dict[str, Any]:
-    return {"plans": plan_config()}
+    return {
+        "plans": plan_config(),
+        "registration": {"emailVerificationRequired": email_verification_required()},
+    }
+
+
+def email_verification_required() -> bool:
+    return os.environ.get("EMAIL_VERIFICATION_REQUIRED", "false").strip().lower() in {"true", "1", "yes"}
+
+
+class VerificationError(Exception):
+    def __init__(self, status: int, message: str, retry_after: int = 0):
+        super().__init__(message)
+        self.status = status
+        self.retry_after = retry_after
+
+
+def verification_settings() -> tuple[str, str, bytes]:
+    api_key = os.environ.get("RESEND_API_KEY", "").strip()
+    sender = os.environ.get("EMAIL_FROM", "").strip()
+    secret = os.environ.get("WHOP_CHECKOUT_SIGNING_SECRET", "").strip()
+    if not api_key or not sender or not secret:
+        raise VerificationError(HTTPStatus.SERVICE_UNAVAILABLE, "邮箱验证服务尚未配置完成，请稍后再试。")
+    return api_key, sender, secret.encode("utf-8")
+
+
+def verification_digest(token_hash: str, code: str) -> str:
+    secret = verification_settings()[2]
+    return hmac.new(secret, f"email-verification:{token_hash}:{code}".encode(), hashlib.sha256).hexdigest()
+
+
+def send_verification_email(email: str, code: str, request_id: str) -> None:
+    api_key, sender, _ = verification_settings()
+    payload = {
+        "from": sender,
+        "to": [email],
+        "subject": "Northstar Locate 注册验证码",
+        "text": f"您的 Northstar Locate 注册验证码是：{code}。验证码在 10 分钟内有效，请在注册页面输入。若非本人操作，请忽略此邮件。",
+        "html": f'<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:32px"><h2>Northstar Locate</h2><p>请在注册页面输入以下验证码：</p><p style="font-size:32px;letter-spacing:8px;font-weight:bold">{code}</p><p>验证码在 10 分钟内有效。</p><p>若非本人操作，请忽略此邮件。</p></div>',
+    }
+    request = Request(
+        "https://api.resend.com/emails",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "Idempotency-Key": request_id, "User-Agent": "NorthstarLocate/2.1"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=15) as response:
+            result = json.load(response)
+            if not isinstance(result, dict) or not result.get("id"):
+                raise ValueError("missing email identifier")
+    except (HTTPError, URLError, OSError, ValueError) as exc:
+        # Keep credentials, codes, recipient addresses and provider bodies out of logs.
+        print(f"Verification email delivery failed: {type(exc).__name__}")
+        raise VerificationError(HTTPStatus.BAD_GATEWAY, "验证码发送失败，请稍后重试；如持续失败，请联系网站管理员。") from None
+
+
+def reserve_email_send(db: sqlite3.Connection, email: str, requester: str, timestamp: int) -> None:
+    secret = verification_settings()[2]
+    requester_hash = hmac.new(secret, f"email-requester:{requester}".encode(), hashlib.sha256).hexdigest()
+    db.execute("DELETE FROM email_send_attempts WHERE created_at <= ?", (timestamp - 3600,))
+    latest = db.execute("SELECT MAX(created_at) FROM email_send_attempts WHERE email = ?", (email,)).fetchone()[0]
+    if latest is not None and timestamp - latest < VERIFICATION_COOLDOWN:
+        remaining = VERIFICATION_COOLDOWN - (timestamp - latest)
+        raise VerificationError(HTTPStatus.TOO_MANY_REQUESTS, f"请等待 {remaining} 秒后重新发送。", remaining)
+    email_count = db.execute("SELECT COUNT(*) FROM email_send_attempts WHERE email = ?", (email,)).fetchone()[0]
+    requester_count = db.execute("SELECT COUNT(*) FROM email_send_attempts WHERE requester_hash = ?", (requester_hash,)).fetchone()[0]
+    total_count = db.execute("SELECT COUNT(*) FROM email_send_attempts").fetchone()[0]
+    if email_count >= 5 or requester_count >= 20 or total_count >= 100:
+        raise VerificationError(HTTPStatus.TOO_MANY_REQUESTS, "验证码发送次数过多，请一小时后再试。", 3600)
+    db.execute("INSERT INTO email_send_attempts(email, requester_hash, created_at) VALUES (?, ?, ?)", (email, requester_hash, timestamp))
+
+
+def verification_response(token: str, email: str) -> dict[str, Any]:
+    return {"verificationRequired": True, "challengeToken": token, "email": email, "expiresIn": VERIFICATION_TTL, "resendAfter": VERIFICATION_COOLDOWN}
+
+
+def begin_email_verification(email: str, password: str, requester: str) -> dict[str, Any]:
+    verification_settings()
+    token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    code_hash = verification_digest(token_hash, code)
+    password_hash = hash_password(password)
+    timestamp = now()
+    with db_connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        if db.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
+            raise VerificationError(HTTPStatus.CONFLICT, "该邮箱已经注册，请直接登录。")
+        reserve_email_send(db, email, requester, timestamp)
+        db.execute("DELETE FROM email_verifications WHERE created_at <= ?", (timestamp - 3600,))
+        db.execute("DELETE FROM email_verifications WHERE email = ?", (email,))
+        db.execute(
+            "INSERT INTO email_verifications(token_hash, email, password_hash, code_hash, expires_at, sent_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (token_hash, email, password_hash, code_hash, timestamp + VERIFICATION_TTL, timestamp, timestamp),
+        )
+    try:
+        send_verification_email(email, code, f"registration/{token_hash}/{timestamp}")
+    except VerificationError:
+        with db_connect() as db:
+            db.execute("DELETE FROM email_verifications WHERE token_hash = ?", (token_hash,))
+        raise
+    with db_connect() as db:
+        db.execute("UPDATE email_verifications SET ready = 1 WHERE token_hash = ?", (token_hash,))
+    return verification_response(token, email)
+
+
+def resend_email_verification(token: str, requester: str) -> dict[str, Any]:
+    verification_settings()
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    code_hash = verification_digest(token_hash, code)
+    timestamp = now()
+    with db_connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute("SELECT * FROM email_verifications WHERE token_hash = ?", (token_hash,)).fetchone()
+        if row is None or timestamp - row["created_at"] >= 3600:
+            raise VerificationError(HTTPStatus.BAD_REQUEST, "注册验证已失效，请重新填写邮箱和密码。")
+        reserve_email_send(db, row["email"], requester, timestamp)
+        db.execute("UPDATE email_verifications SET code_hash = ?, expires_at = ?, attempts = 0, ready = 0, sent_at = ? WHERE token_hash = ?", (code_hash, timestamp + VERIFICATION_TTL, timestamp, token_hash))
+    send_verification_email(row["email"], code, f"registration/{token_hash}/{timestamp}")
+    with db_connect() as db:
+        db.execute("UPDATE email_verifications SET ready = 1 WHERE token_hash = ? AND code_hash = ?", (token_hash, code_hash))
+    return verification_response(token, row["email"])
+
+
+def complete_email_verification(token: str, code: str) -> sqlite3.Row:
+    verification_settings()
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    timestamp = now()
+    failure = None
+    user = None
+    with db_connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute("SELECT * FROM email_verifications WHERE token_hash = ?", (token_hash,)).fetchone()
+        if row is None:
+            failure = VerificationError(HTTPStatus.BAD_REQUEST, "注册验证已失效，请重新注册。")
+        elif row["expires_at"] <= timestamp:
+            failure = VerificationError(HTTPStatus.BAD_REQUEST, "验证码已过期，请重新发送。")
+        elif row["attempts"] >= VERIFICATION_MAX_ATTEMPTS:
+            failure = VerificationError(HTTPStatus.TOO_MANY_REQUESTS, "验证码错误次数过多，请重新发送验证码。")
+        elif not row["ready"]:
+            failure = VerificationError(HTTPStatus.BAD_REQUEST, "验证码尚未发送成功，请重新发送。")
+        elif not re.fullmatch(r"[0-9]{6}", code) or not hmac.compare_digest(row["code_hash"], verification_digest(token_hash, code)):
+            db.execute("UPDATE email_verifications SET attempts = attempts + 1 WHERE token_hash = ?", (token_hash,))
+            failure = VerificationError(HTTPStatus.BAD_REQUEST, "验证码不正确，请检查邮件后重试。")
+        elif db.execute("SELECT 1 FROM users WHERE email = ?", (row["email"],)).fetchone():
+            failure = VerificationError(HTTPStatus.CONFLICT, "该邮箱已经注册，请直接登录。")
+        else:
+            cursor = db.execute("INSERT INTO users(email, password_hash, email_verified_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?)", (row["email"], row["password_hash"], timestamp, timestamp, timestamp))
+            user = db.execute("SELECT * FROM users WHERE id = ?", (cursor.lastrowid,)).fetchone()
+            db.execute("DELETE FROM email_verifications WHERE email = ?", (row["email"],))
+    # Raise after committing so failed attempts cannot be reset by transaction rollback.
+    if failure:
+        raise failure
+    assert user is not None
+    return user
 
 
 def checkout_signing_secret() -> str:
@@ -332,7 +518,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def read_json(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
-        if length > 64 * 1024:
+        if not 0 <= length <= 64 * 1024:
             raise ValueError("request body is too large")
         value = json.loads(self.rfile.read(length).decode("utf-8") if length else "{}")
         if not isinstance(value, dict):
@@ -341,6 +527,20 @@ class Handler(BaseHTTPRequestHandler):
 
     def require_user(self) -> sqlite3.Row | None:
         return user_from_request(self)
+
+    def verification_requester(self) -> str:
+        # Render appends the connecting client's address to X-Forwarded-For.
+        # Do not trust caller-controlled proxy headers on a local deployment.
+        if os.environ.get("RENDER", "").lower() == "true":
+            forwarded = self.headers.get("X-Forwarded-For", "").split(",")[-1].strip()
+            try:
+                return str(ipaddress.ip_address(forwarded))
+            except ValueError:
+                pass
+        return self.client_address[0]
+
+    def verification_error(self, error: VerificationError) -> None:
+        self.send_json(error.status, {"error": str(error), "retryAfter": error.retry_after})
 
     def admin_ok(self) -> bool:
         password = os.environ.get("ADMIN_PASSWORD", "")
@@ -442,11 +642,19 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/auth/register":
             email = str(body.get("email", "")).strip().lower()
             password = str(body.get("password", ""))
-            if not EMAIL_RE.fullmatch(email):
+            if len(email) > 254 or not EMAIL_RE.fullmatch(email):
                 self.send_json(HTTPStatus.BAD_REQUEST, {"error": "请输入有效邮箱地址。"})
                 return
-            if len(password) < 8:
-                self.send_json(HTTPStatus.BAD_REQUEST, {"error": "密码至少需要 8 位。"})
+            if not 8 <= len(password) <= 128:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": "密码需要 8 至 128 位。"})
+                return
+            if email_verification_required():
+                try:
+                    pending = begin_email_verification(email, password, self.verification_requester())
+                except VerificationError as exc:
+                    self.verification_error(exc)
+                    return
+                self.send_json(HTTPStatus.ACCEPTED, pending)
                 return
             timestamp = now()
             try:
@@ -464,9 +672,29 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(HTTPStatus.OK, {"user": safe_user(user)}, [cookie_header("northstar_session", token, SESSION_TTL, request_is_secure(self))])
             return
 
+        if parsed.path in {"/api/auth/verify-email", "/api/auth/resend-verification"}:
+            challenge = str(body.get("challengeToken", ""))
+            if not re.fullmatch(r"[A-Za-z0-9_-]{43}", challenge):
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": "注册验证已失效，请重新注册。"})
+                return
+            try:
+                if parsed.path == "/api/auth/resend-verification":
+                    pending = resend_email_verification(challenge, self.verification_requester())
+                    self.send_json(HTTPStatus.OK, pending)
+                else:
+                    user = complete_email_verification(challenge, str(body.get("code", "")).strip())
+                    token = create_session(user["id"])
+                    self.send_json(HTTPStatus.OK, {"user": safe_user(user)}, [cookie_header("northstar_session", token, SESSION_TTL, request_is_secure(self))])
+            except VerificationError as exc:
+                self.verification_error(exc)
+            return
+
         if parsed.path == "/api/auth/login":
             email = str(body.get("email", "")).strip().lower()
             password = str(body.get("password", ""))
+            if len(email) > 254 or len(password) > 128:
+                self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "邮箱或密码不正确。"})
+                return
             with db_connect() as db:
                 user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
             if user is None or not verify_password(password, user["password_hash"]):
