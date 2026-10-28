@@ -243,10 +243,12 @@ def email_verification_required() -> bool:
 
 
 class VerificationError(Exception):
-    def __init__(self, status: int, message: str, retry_after: int = 0):
+    def __init__(self, status: int, message: str, retry_after: int = 0, error_code: str = ""):
         super().__init__(message)
         self.status = status
         self.retry_after = retry_after
+        self.error_code = error_code
+        self.pending: dict[str, Any] = {}
 
 
 def verification_settings() -> tuple[str, str, bytes]:
@@ -261,6 +263,34 @@ def verification_settings() -> tuple[str, str, bytes]:
 def verification_digest(token_hash: str, code: str) -> str:
     secret = verification_settings()[2]
     return hmac.new(secret, f"email-verification:{token_hash}:{code}".encode(), hashlib.sha256).hexdigest()
+
+
+def email_delivery_error(status: int = 0, provider: Any = None) -> VerificationError:
+    # Classify provider errors without disclosing their raw body or account data.
+    provider = provider if isinstance(provider, dict) else {}
+    name = str(provider.get("name", "")).lower()
+    message = str(provider.get("message", "")).lower()
+    if status == 401:
+        category = "EMAIL_API_KEY_INVALID"
+    elif status == 422 and ("from" in message or "sender" in message):
+        category = "EMAIL_FROM_INVALID"
+    elif status == 403 and ("domain" in message or "verify" in message or "testing emails" in message):
+        category = "EMAIL_DOMAIN_OR_ACCESS"
+    elif status == 403:
+        category = "EMAIL_PERMISSION_DENIED"
+    elif status == 429 or "quota" in name:
+        category = "EMAIL_PROVIDER_LIMIT"
+    elif status:
+        category = "EMAIL_PROVIDER_ERROR"
+    else:
+        category = "EMAIL_CONNECTION_ERROR"
+    print(f"Verification email delivery failed: HTTP {status or 'unavailable'} ({category})", flush=True)
+    return VerificationError(
+        HTTPStatus.BAD_GATEWAY,
+        f"验证码发送失败，请稍后重试；如持续失败，请联系网站管理员。（{category}）",
+        VERIFICATION_COOLDOWN,
+        category,
+    )
 
 
 def send_verification_email(email: str, code: str, request_id: str) -> None:
@@ -283,10 +313,15 @@ def send_verification_email(email: str, code: str, request_id: str) -> None:
             result = json.load(response)
             if not isinstance(result, dict) or not result.get("id"):
                 raise ValueError("missing email identifier")
-    except (HTTPError, URLError, OSError, ValueError) as exc:
-        # Keep credentials, codes, recipient addresses and provider bodies out of logs.
-        print(f"Verification email delivery failed: {type(exc).__name__}")
-        raise VerificationError(HTTPStatus.BAD_GATEWAY, "验证码发送失败，请稍后重试；如持续失败，请联系网站管理员。") from None
+    except HTTPError as exc:
+        try:
+            with exc:
+                provider = json.loads(exc.read(16 * 1024))
+        except (OSError, ValueError):
+            provider = None
+        raise email_delivery_error(exc.code, provider) from None
+    except (URLError, OSError, ValueError):
+        raise email_delivery_error() from None
 
 
 def reserve_email_send(db: sqlite3.Connection, email: str, requester: str, timestamp: int) -> None:
@@ -305,8 +340,8 @@ def reserve_email_send(db: sqlite3.Connection, email: str, requester: str, times
     db.execute("INSERT INTO email_send_attempts(email, requester_hash, created_at) VALUES (?, ?, ?)", (email, requester_hash, timestamp))
 
 
-def verification_response(token: str, email: str) -> dict[str, Any]:
-    return {"verificationRequired": True, "challengeToken": token, "email": email, "expiresIn": VERIFICATION_TTL, "resendAfter": VERIFICATION_COOLDOWN}
+def verification_response(token: str, email: str, email_sent: bool = True, code_available: bool = True) -> dict[str, Any]:
+    return {"verificationRequired": True, "challengeToken": token, "email": email, "expiresIn": VERIFICATION_TTL, "resendAfter": VERIFICATION_COOLDOWN, "emailSent": email_sent, "codeAvailable": code_available}
 
 
 def begin_email_verification(email: str, password: str, requester: str) -> dict[str, Any]:
@@ -330,9 +365,10 @@ def begin_email_verification(email: str, password: str, requester: str) -> dict[
         )
     try:
         send_verification_email(email, code, f"registration/{token_hash}/{timestamp}")
-    except VerificationError:
-        with db_connect() as db:
-            db.execute("DELETE FROM email_verifications WHERE token_hash = ?", (token_hash,))
+    except VerificationError as exc:
+        # Preserve a retryable challenge, but ready=0 still blocks registration.
+        exc.pending = verification_response(token, email, email_sent=False, code_available=False)
+        exc.retry_after = max(exc.retry_after, VERIFICATION_COOLDOWN)
         raise
     with db_connect() as db:
         db.execute("UPDATE email_verifications SET ready = 1 WHERE token_hash = ?", (token_hash,))
@@ -351,10 +387,15 @@ def resend_email_verification(token: str, requester: str) -> dict[str, Any]:
         if row is None or timestamp - row["created_at"] >= 3600:
             raise VerificationError(HTTPStatus.BAD_REQUEST, "注册验证已失效，请重新填写邮箱和密码。")
         reserve_email_send(db, row["email"], requester, timestamp)
-        db.execute("UPDATE email_verifications SET code_hash = ?, expires_at = ?, attempts = 0, ready = 0, sent_at = ? WHERE token_hash = ?", (code_hash, timestamp + VERIFICATION_TTL, timestamp, token_hash))
-    send_verification_email(row["email"], code, f"registration/{token_hash}/{timestamp}")
+    try:
+        send_verification_email(row["email"], code, f"registration/{token_hash}/{timestamp}")
+    except VerificationError as exc:
+        # A failed resend must not invalidate a code already delivered earlier.
+        exc.pending = verification_response(token, row["email"], email_sent=False, code_available=bool(row["ready"]) and row["expires_at"] > now() and row["attempts"] < VERIFICATION_MAX_ATTEMPTS)
+        exc.retry_after = max(exc.retry_after, VERIFICATION_COOLDOWN)
+        raise
     with db_connect() as db:
-        db.execute("UPDATE email_verifications SET ready = 1 WHERE token_hash = ? AND code_hash = ?", (token_hash, code_hash))
+        db.execute("UPDATE email_verifications SET code_hash = ?, expires_at = ?, attempts = 0, ready = 1, sent_at = ? WHERE token_hash = ?", (code_hash, timestamp + VERIFICATION_TTL, timestamp, token_hash))
     return verification_response(token, row["email"])
 
 
@@ -540,7 +581,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.client_address[0]
 
     def verification_error(self, error: VerificationError) -> None:
-        self.send_json(error.status, {"error": str(error), "retryAfter": error.retry_after})
+        self.send_json(error.status, {**error.pending, "error": str(error), "retryAfter": error.retry_after, "errorCode": error.error_code})
 
     def admin_ok(self) -> bool:
         password = os.environ.get("ADMIN_PASSWORD", "")

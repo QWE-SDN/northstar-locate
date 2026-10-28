@@ -262,6 +262,7 @@
           <button class="auth-secondary" id="auth-resend" type="button" hidden>重新发送验证码</button>
           <button class="auth-secondary" id="auth-back" type="button" hidden>修改邮箱或密码</button>
           <div class="auth-message" id="auth-message" role="alert" aria-live="polite"></div>
+          <p class="auth-message" id="auth-countdown" hidden aria-live="off"></p>
         </form>
       </div>
     </div>
@@ -291,6 +292,7 @@
       const authHint = document.querySelector('#auth-hint');
       const authSubmit = document.querySelector('#auth-submit');
       const authMessage = document.querySelector('#auth-message');
+      const authCountdown = document.querySelector('#auth-countdown');
       const authTabs = document.querySelectorAll('[data-auth-mode]');
       const paymentModal = document.querySelector('#payment-modal');
       const paymentClose = document.querySelector('#payment-close');
@@ -335,6 +337,8 @@
         if (!response.ok) {
           const error = new Error(body.error || `请求失败（${response.status}）`);
           error.retryAfter = Number(body.retryAfter) || 0;
+          error.status = response.status;
+          error.verification = body.verificationRequired && body.challengeToken ? body : null;
           throw error;
         }
         return body;
@@ -378,6 +382,10 @@
         if (authBusy) return;
         verification = null;
         window.clearInterval(resendTimer);
+        resendTimer = null;
+        resendAvailableAt = 0;
+        authCountdown.hidden = true;
+        authCountdown.textContent = '';
         authMode = mode;
         authTabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.authMode === mode));
         updateAuthPrompt();
@@ -394,22 +402,43 @@
         authResend.hidden = true;
         authBack.hidden = true;
         authMessage.textContent = '';
+        updateResendButton();
       }
 
       function updateResendButton() {
         const remaining = Math.max(0, Math.ceil((resendAvailableAt - Date.now()) / 1000));
         authResend.disabled = authBusy || remaining > 0;
+        authSubmit.disabled = authBusy || (!verification && authMode === 'register' && verificationRequired && remaining > 0);
         authResend.textContent = remaining > 0 ? `${remaining} 秒后可重新发送` : '重新发送验证码';
+        authCountdown.hidden = remaining === 0;
+        authCountdown.textContent = remaining > 0 ? `请等待 ${remaining} 秒后重新发送。` : '';
+        if (!verification && authMode === 'register' && verificationRequired) {
+          authSubmit.disabled = authBusy || remaining > 0;
+          authSubmit.textContent = authBusy ? '正在发送…' : (remaining > 0 ? `${remaining} 秒后可重新发送` : '发送验证码');
+        }
+        if (remaining === 0) {
+          window.clearInterval(resendTimer);
+          resendTimer = null;
+        }
       }
 
       function startResendCooldown(seconds) {
-        resendAvailableAt = Date.now() + seconds * 1000;
         window.clearInterval(resendTimer);
-        updateResendButton();
+        resendAvailableAt = Date.now() + Math.max(0, Number(seconds) || 0) * 1000;
         resendTimer = window.setInterval(updateResendButton, 1000);
+        updateResendButton();
+      }
+
+      function showAuthError(error, fallback) {
+        if (error.verification) showVerification(error.verification);
+        authMessage.textContent = error.status === 429 && error.retryAfter > 0
+          ? '验证码发送过于频繁，请在倒计时结束后重试。'
+          : (error.message || fallback);
+        if (error.retryAfter > 0) startResendCooldown(error.retryAfter);
       }
 
       function showVerification(body) {
+        const keepCode = verification && verification.challengeToken === body.challengeToken && body.emailSent === false;
         verification = body;
         authEmail.value = body.email;
         authEmail.readOnly = true;
@@ -420,10 +449,12 @@
         authCodeRow.hidden = false;
         authCode.disabled = false;
         authCode.required = true;
-        authCode.value = '';
+        if (!keepCode) authCode.value = '';
         authResend.hidden = false;
         authBack.hidden = false;
-        authHint.textContent = `验证码已发送至 ${body.email}，10 分钟内有效；未收到时请检查垃圾邮件。`;
+        authHint.textContent = body.emailSent === false
+          ? (body.codeAvailable ? '本次重发未成功，之前收到且未过期的验证码仍可使用，也可在倒计时结束后重新发送。' : '邮件尚未发送成功，请在倒计时结束后点击“重新发送验证码”，收到后在上方填写六位验证码。')
+          : `验证码已发送至 ${body.email}，10 分钟内有效；未收到时请检查垃圾邮件。`;
         authSubmit.textContent = '验证并注册';
         startResendCooldown(body.resendAfter || 60);
         authCode.focus();
@@ -525,15 +556,14 @@
           const body = await requestJson('/api/auth/resend-verification', { method: 'POST', body: JSON.stringify({ challengeToken: verification.challengeToken }) });
           showVerification(body);
         } catch (error) {
-          authMessage.textContent = error.message || '验证码发送失败，请稍后重试。';
-          startResendCooldown(error.retryAfter || 60);
+          showAuthError(error, '验证码发送失败，请稍后重试。');
         } finally {
           setAuthBusy(false);
         }
       });
       authForm.addEventListener('submit', async (event) => {
         event.preventDefault();
-        if (authBusy) return;
+        if (authBusy || (!verification && authMode === 'register' && Date.now() < resendAvailableAt)) return;
         setAuthBusy(true);
         authMessage.textContent = '';
         try {
@@ -553,7 +583,7 @@
           authForm.reset();
           if (plan) openPayment(plan);
         } catch (error) {
-          authMessage.textContent = error.message || '账号操作失败，请重试。';
+          showAuthError(error, '账号操作失败，请重试。');
         } finally {
           setAuthBusy(false);
         }
