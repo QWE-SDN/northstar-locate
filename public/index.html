@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Northstar Locate：发送经过同意的手机位置请求。">
     <title>Northstar Locate | 找到方向</title>
-    <script src="https://js.stripe.com/v3/"></script>
+    <script src="https://cdn.whop.com/elements/amber/elements.js" data-whop-elements></script>
     <style>
       :root {
         color-scheme: light;
@@ -35,6 +35,11 @@
       .brand-name { transform: translateY(1px); }
       .nav { display: flex; align-items: center; gap: 28px; color: var(--muted); font-size: 14px; }
       .nav a:hover { color: var(--blue); }
+      .account-button { border: 1px solid var(--blue); border-radius: 7px; padding: 9px 13px; background: #fff; color: var(--blue); font-weight: 750; cursor: pointer; }
+      .account-button:hover { background: #eaf2ff; }
+      .account-state { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-size: 13px; }
+      .account-email { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .account-logout { border: 0; padding: 0; background: transparent; color: var(--blue); font-size: 12px; cursor: pointer; }
       .language { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff; font-size: 13px; }
       .flag { font-size: 16px; }
       .menu-toggle { display: none; width: 40px; height: 40px; border: 0; background: transparent; color: var(--ink); cursor: pointer; font-size: 24px; }
@@ -131,9 +136,27 @@
       .payment-submit:hover { background: var(--blue-dark); }
       .payment-submit:disabled { cursor: wait; opacity: .65; }
       .payment-error { min-height: 20px; margin: 12px 0 0; color: #b42318; font-size: 13px; line-height: 1.5; }
+      #checkout-element { min-height: 320px; margin-top: 24px; }
+      .auth-modal { position: fixed; inset: 0; z-index: 30; display: none; place-items: center; padding: 20px; background: rgb(20 35 74 / 48%); }
+      .auth-modal.open { display: grid; }
+      .auth-dialog { width: min(100%, 430px); padding: 28px; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: 0 24px 70px rgb(20 35 74 / 30%); }
+      .auth-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+      .auth-head h2 { margin: 0; font-size: 28px; }
+      .auth-close { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--ink); font-size: 24px; line-height: 1; cursor: pointer; }
+      .auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 23px 0 18px; padding: 4px; border-radius: 8px; background: var(--sky); }
+      .auth-tab { border: 0; border-radius: 6px; padding: 10px; background: transparent; color: var(--muted); font-weight: 750; cursor: pointer; }
+      .auth-tab.active { background: #fff; color: var(--blue); box-shadow: 0 2px 8px rgb(20 35 74 / 10%); }
+      .auth-form { display: grid; gap: 13px; }
+      .auth-form label { display: grid; gap: 7px; color: var(--ink); font-size: 13px; font-weight: 700; }
+      .auth-form input { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 12px; outline: 0; }
+      .auth-form input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb(47 104 245 / 12%); }
+      .auth-submit { border: 0; border-radius: 7px; padding: 13px; background: var(--blue); color: #fff; font-weight: 800; cursor: pointer; }
+      .auth-submit:disabled { cursor: wait; opacity: .65; }
+      .auth-message { min-height: 20px; margin: 3px 0 0; color: #b42318; font-size: 13px; line-height: 1.5; }
+      .auth-hint { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
       body.modal-open { overflow: hidden; }
       @media (max-width: 850px) { .hero { grid-template-columns: 1fr; gap: 43px; padding-top: 55px; } .hero-visual { min-height: 360px; } .visual-frame { height: 360px; } .status-card { left: 14px; } .benefit-grid,.steps { grid-template-columns: 1fr; } .consent-band { grid-template-columns: 1fr; } }
-      @media (max-width: 620px) { .shell { width: min(100% - 28px, 1160px); } .site-header { min-height: 68px; } .nav { display: none; position: absolute; top: 68px; left: 14px; right: 14px; z-index: 4; flex-direction: column; align-items: stretch; gap: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: 0 15px 30px rgb(20 35 74 / 14%); } .nav.open { display: flex; } .nav a,.nav .language { padding: 12px 10px; } .menu-toggle { display: block; } .hero { padding: 44px 0 58px; } h1 { font-size: 45px; } .hero-copy { font-size: 16px; } .lookup-form { padding: 5px; } .lookup-form select { width: 98px; font-size: 13px; } .lookup-form input { padding: 11px 9px; font-size: 14px; } .hero-visual,.visual-frame { min-height: 290px; height: 290px; } .status-card { width: 235px; bottom: 15px; } .trust-inner,.footer-inner { align-items: flex-start; flex-direction: column; } section { padding: 70px 0; } .pricing { grid-template-columns: 1fr; } .consent-band { padding: 28px 22px; } }
+      @media (max-width: 620px) { .shell { width: min(100% - 28px, 1160px); } .site-header { min-height: 68px; } .nav { display: none; position: absolute; top: 68px; left: 14px; right: 14px; z-index: 4; flex-direction: column; align-items: stretch; gap: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: 0 15px 30px rgb(20 35 74 / 14%); } .nav.open { display: flex; } .nav a,.nav .language,.nav .account-button,.nav .account-state { padding: 12px 10px; } .account-state { justify-content: space-between; } .menu-toggle { display: block; } .hero { padding: 44px 0 58px; } h1 { font-size: 45px; } .hero-copy { font-size: 16px; } .lookup-form { padding: 5px; } .lookup-form select { width: 98px; font-size: 13px; } .lookup-form input { padding: 11px 9px; font-size: 14px; } .hero-visual,.visual-frame { min-height: 290px; height: 290px; } .status-card { width: 235px; bottom: 15px; } .trust-inner,.footer-inner { align-items: flex-start; flex-direction: column; } section { padding: 70px 0; } .pricing { grid-template-columns: 1fr; } .consent-band { padding: 28px 22px; } }
     </style>
   </head>
   <body>
@@ -145,6 +168,8 @@
         <a href="#pricing">价格</a>
         <a href="#faq">常见问题</a>
         <span class="language"><span class="flag">🇭🇰</span> 中文</span>
+        <button class="account-button" id="account-open" type="button">登录 / 注册</button>
+        <span class="account-state" id="account-state" hidden><span class="account-email" id="account-email"></span><button class="account-logout" id="account-logout" type="button">退出</button></span>
       </nav>
     </header>
 
@@ -193,44 +218,13 @@
       </section>
 
       <section class="shell" id="pricing">
-        <div class="section-heading"><p class="eyebrow">价格</p><h2>先从适合你的方式开始。</h2><p>选择方案后，付款表单会直接在本网站内打开，卡片信息由 Stripe 安全处理。</p></div>
-<div class="pricing">
-  <article class="price-card featured">
-    <span class="price-badge">推荐</span>
-    <h3>月度方案</h3>
-    <div class="price">$99.00 <small>/ 月</small></div>
-    <p class="price-copy">适合需要持续使用请求工作区的用户。</p>
-    <ul class="plan-list">
-      <li>更多请求额度</li>
-      <li>请求历史记录</li>
-      <li>统一工作区</li>
-      <li>随时取消</li>
-    </ul>
-    <button class="plan-button" type="button" data-plan="monthly">
-      选择月度方案
-    </button>
-  </article>
-
-  <article class="price-card">
-    <h3>年度方案</h3>
-    <div class="price">$199.00 <small>/ 年</small></div>
-    <p class="price-copy">适合长期使用请求工作区的用户。</p>
-    <ul class="plan-list">
-      <li>年度使用权益</li>
-      <li>请求历史记录</li>
-      <li>优先使用</li>
-      <li>随时取消</li>
-    </ul>
-    <button class="plan-button" type="button" data-plan="yearly">
-      选择年度方案
-    </button>
-  </article>
-</div>
+        <div class="section-heading"><p class="eyebrow">价格</p><h2>先从适合你的方式开始。</h2><p>注册或登录后，付款表单会直接在本网站内打开，付款由 Whop 安全处理。</p></div>
+        <div class="pricing"><article class="price-card featured"><span class="price-badge">推荐</span><h3>月度方案</h3><div class="price">$99.00 <small>/ 月</small></div><p class="price-copy">适合需要持续使用请求工作区的用户。</p><ul class="plan-list"><li>更多请求额度</li><li>请求历史记录</li><li>统一工作区</li><li>随时取消</li></ul><button class="plan-button" type="button" data-plan="monthly">选择月度方案</button></article><article class="price-card"><h3>年度方案</h3><div class="price">$199.00 <small>/ 年</small></div><p class="price-copy">适合长期使用请求工作区的用户。</p><ul class="plan-list"><li>年度使用权益</li><li>请求历史记录</li><li>统一工作区</li><li>优先使用</li></ul><button class="plan-button" type="button" data-plan="yearly">选择年度方案</button></article></div>
       </section>
 
       <section class="shell"><div class="consent-band"><div><p class="eyebrow">隐私优先</p><h2>不隐藏过程，也不替别人做决定。</h2><p>真实的位置服务必须建立在收件人知情和同意的基础上。Northstar Locate 的页面和后续接口都会把这一步放在核心流程里。</p></div><div class="consent-box"><strong>请求状态示例</strong>已创建 → 等待确认 → 对方同意 → 显示可用结果</div></div></section>
 
-      <section class="shell" id="faq"><div class="section-heading"><p class="eyebrow">常见问题</p><h2>你可能想先了解这些。</h2></div><div class="faq-list"><details open><summary>只输入电话号码就能直接看到位置吗？</summary><p>不能。号码只能用来创建请求，收件人需要看到说明并主动同意，之后系统才会继续。</p></details><details><summary>支持哪些手机？</summary><p>页面支持常见国家和地区的手机号码格式，真正的短信和位置服务接口将在后续接入后决定实际覆盖范围。</p></details><details><summary>收件人会知道这是位置请求吗？</summary><p>会。正式版本应明确说明请求目的、有效时间和可选的同意或拒绝操作。</p></details><details><summary>付款功能现在可以使用吗？</summary><p>选择价格方案后，Stripe Payment Element 会在本网站内打开，付款由 Stripe 处理。</p></details><details><summary>我的输入会保存吗？</summary><p>当前演示只在浏览器本地显示请求状态，不会把号码发送到外部服务。</p></details></div></section>
+      <section class="shell" id="faq"><div class="section-heading"><p class="eyebrow">常见问题</p><h2>你可能想先了解这些。</h2></div><div class="faq-list"><details open><summary>只输入电话号码就能直接看到位置吗？</summary><p>不能。号码只能用来创建请求，收件人需要看到说明并主动同意，之后系统才会继续。</p></details><details><summary>支持哪些手机？</summary><p>页面支持常见国家和地区的手机号码格式，真正的短信和位置服务接口将在后续接入后决定实际覆盖范围。</p></details><details><summary>收件人会知道这是位置请求吗？</summary><p>会。正式版本应明确说明请求目的、有效时间和可选的同意或拒绝操作。</p></details><details><summary>付款功能现在可以使用吗？</summary><p>选择价格方案后，Whop Checkout 会在本网站内打开，付款成功后由服务器 Webhook 更新账号订阅状态。</p></details><details><summary>注册需要邮箱验证码吗？</summary><p>当前版本注册只需要邮箱和至少 8 位密码，不发送验证码。正式启用验证码时，需要接入邮件服务并增加验证码过期、重试限制和已验证状态。</p></details></div></section>
     </main>
 
     <footer><div class="shell footer-inner"><a class="brand" href="#top"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Northstar Locate</span></a><div class="footer-links"><a href="#how-it-works">工作原理</a><a href="#pricing">价格</a><a href="#faq">常见问题</a><a href="#top">隐私政策</a><a href="#top">服务条款</a></div><span>© 2026 Northstar Locate</span></div></footer>
@@ -239,17 +233,28 @@
       <div class="payment-dialog" role="dialog" aria-modal="true" aria-labelledby="payment-title">
         <div class="payment-header">
           <div>
-            <p class="eyebrow">Stripe 安全付款</p>
+            <p class="eyebrow">Whop 安全付款</p>
             <h2 id="payment-title">准备付款</h2>
             <p id="payment-summary">付款信息将在此处加载。</p>
           </div>
           <button class="payment-close" id="payment-close" type="button" aria-label="关闭付款窗口">×</button>
         </div>
         <div class="payment-loading" id="payment-loading">正在准备安全付款表单…</div>
-        <form id="payment-form" hidden>
-          <div id="payment-element"></div>
-          <button class="payment-submit" id="payment-submit" type="submit">确认付款</button>
-          <div class="payment-error" id="payment-error" role="alert" aria-live="polite"></div>
+        <div id="checkout-element" hidden></div>
+        <div class="payment-error" id="payment-error" role="alert" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <div class="auth-modal" id="auth-modal" aria-hidden="true">
+      <div class="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+        <div class="auth-head"><div><p class="eyebrow">Northstar Locate 账号</p><h2 id="auth-title">登录后继续</h2></div><button class="auth-close" id="auth-close" type="button" aria-label="关闭账号窗口">×</button></div>
+        <div class="auth-tabs"><button class="auth-tab active" type="button" data-auth-mode="login">登录</button><button class="auth-tab" type="button" data-auth-mode="register">注册</button></div>
+        <form class="auth-form" id="auth-form">
+          <label>邮箱地址<input id="auth-email" name="email" type="email" autocomplete="email" required></label>
+          <label>密码<input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="8" required></label>
+          <p class="auth-hint" id="auth-hint">使用已注册的邮箱和密码登录。</p>
+          <button class="auth-submit" id="auth-submit" type="submit">登录</button>
+          <div class="auth-message" id="auth-message" role="alert" aria-live="polite"></div>
         </form>
       </div>
     </div>
@@ -262,6 +267,29 @@
       const phone = document.querySelector('#phone');
       const result = document.querySelector('#request-result');
       const resultCopy = document.querySelector('#result-copy');
+      const accountOpen = document.querySelector('#account-open');
+      const accountState = document.querySelector('#account-state');
+      const accountEmail = document.querySelector('#account-email');
+      const accountLogout = document.querySelector('#account-logout');
+      const authModal = document.querySelector('#auth-modal');
+      const authClose = document.querySelector('#auth-close');
+      const authForm = document.querySelector('#auth-form');
+      const authEmail = document.querySelector('#auth-email');
+      const authPassword = document.querySelector('#auth-password');
+      const authHint = document.querySelector('#auth-hint');
+      const authSubmit = document.querySelector('#auth-submit');
+      const authMessage = document.querySelector('#auth-message');
+      const authTabs = document.querySelectorAll('[data-auth-mode]');
+      const paymentModal = document.querySelector('#payment-modal');
+      const paymentClose = document.querySelector('#payment-close');
+      const paymentLoading = document.querySelector('#payment-loading');
+      const checkoutElement = document.querySelector('#checkout-element');
+      const paymentSummary = document.querySelector('#payment-summary');
+      const paymentError = document.querySelector('#payment-error');
+      let currentUser = null;
+      let authMode = 'login';
+      let pendingPlan = null;
+      let checkoutHandle = null;
 
       menuToggle.addEventListener('click', () => {
         const open = nav.classList.toggle('open');
@@ -284,114 +312,150 @@
         result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       });
 
-      const paymentModal = document.querySelector('#payment-modal');
-      const paymentClose = document.querySelector('#payment-close');
-      const paymentLoading = document.querySelector('#payment-loading');
-      const paymentForm = document.querySelector('#payment-form');
-      const paymentSummary = document.querySelector('#payment-summary');
-      const paymentSubmit = document.querySelector('#payment-submit');
-      const paymentError = document.querySelector('#payment-error');
-      let stripe;
-      let elements;
-      let paymentElement;
+      async function requestJson(url, options = {}) {
+        const response = await fetch(url, { credentials: 'same-origin', ...options, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || `请求失败（${response.status}）`);
+        return body;
+      }
+
+      function setCurrentUser(user) {
+        currentUser = user || null;
+        accountOpen.hidden = Boolean(currentUser);
+        accountState.hidden = !currentUser;
+        accountEmail.textContent = currentUser ? currentUser.email : '';
+      }
+
+      async function loadCurrentUser() {
+        try {
+          const body = await requestJson('/api/auth/me', { headers: {} });
+          setCurrentUser(body.authenticated ? body.user : null);
+        } catch (error) {
+          setCurrentUser(null);
+          console.warn('Unable to load account session', error);
+        }
+      }
+
+      function setAuthMode(mode) {
+        authMode = mode;
+        authTabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.authMode === mode));
+        authSubmit.textContent = mode === 'login' ? '登录' : '创建账号';
+        authHint.textContent = mode === 'login' ? '使用已注册的邮箱和密码登录。' : '注册无需验证码，密码至少需要 8 位。';
+        authPassword.autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+        authMessage.textContent = '';
+      }
+
+      function openAuth(mode = 'login', planId = null) {
+        pendingPlan = planId;
+        setAuthMode(mode);
+        authModal.classList.add('open');
+        authModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+        window.setTimeout(() => authEmail.focus(), 0);
+      }
+
+      function closeAuth() {
+        authModal.classList.remove('open');
+        authModal.setAttribute('aria-hidden', 'true');
+        authMessage.textContent = '';
+        if (!paymentModal.classList.contains('open')) document.body.classList.remove('modal-open');
+      }
 
       function closePaymentModal() {
         paymentModal.classList.remove('open');
         paymentModal.setAttribute('aria-hidden', 'true');
         document.body.classList.remove('modal-open');
         paymentError.textContent = '';
-      }
-
-      function money(amount, currency) {
-        return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency.toUpperCase() }).format(amount / 100);
+        if (checkoutHandle) {
+          checkoutHandle.destroy();
+          checkoutHandle = null;
+        }
+        checkoutElement.replaceChildren();
+        checkoutElement.hidden = true;
       }
 
       async function openPayment(planId) {
+        if (!currentUser) {
+          openAuth('login', planId);
+          return;
+        }
         paymentModal.classList.add('open');
         paymentModal.setAttribute('aria-hidden', 'false');
         document.body.classList.add('modal-open');
         paymentLoading.hidden = false;
-        paymentForm.hidden = true;
+        paymentLoading.textContent = '正在准备安全付款表单…';
+        checkoutElement.hidden = true;
         paymentError.textContent = '';
-        if (paymentElement) {
-          paymentElement.unmount();
-          paymentElement = null;
+        if (checkoutHandle) {
+          checkoutHandle.destroy();
+          checkoutHandle = null;
         }
-        paymentSummary.textContent = '正在连接 Stripe…';
+        checkoutElement.replaceChildren();
         try {
-          const configResponse = await fetch('/api/config', { cache: 'no-store' });
-          const siteConfig = await configResponse.json();
-          if (!configResponse.ok || !siteConfig.publishableKey) throw new Error('付款暂时不可用，请稍后再试。');
-          const plan = siteConfig.plans && siteConfig.plans[planId];
-          if (!plan) throw new Error('未找到该付款方案。');
-          paymentSummary.textContent = `${plan.productName} · ${money(plan.amount, plan.currency)}`;
-          stripe = stripe || Stripe(siteConfig.publishableKey);
-          const intentResponse = await fetch('/api/create-payment-intent', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Idempotency-Key': `northstar-${planId}-${crypto.randomUUID()}` },
-            body: JSON.stringify({ planId }),
+          const config = await requestJson('/api/config', { headers: {} });
+          const plan = config.plans && config.plans[planId];
+          if (!plan || !plan.planId) throw new Error('该付款方案尚未配置。');
+          paymentSummary.textContent = `${plan.productName} · ${plan.label}`;
+          if (typeof window.WhopElements !== 'function') throw new Error('付款组件加载失败，请刷新页面后重试。');
+          const checkout = await requestJson('/api/whop-checkout-token', { method: 'POST', body: JSON.stringify({ planId }) });
+          const whop = window.WhopElements();
+          checkoutHandle = whop.checkout.create({
+            plan: checkout.planId,
+            metadata: { northstar_checkout_token: checkout.token, northstar_email: checkout.email },
+            returnUrl: `${window.location.origin}/return.html?plan=${encodeURIComponent(planId)}`,
+            onComplete: (completion) => {
+              if (completion.result === 'payment') paymentError.textContent = '付款已完成，正在等待服务器确认订阅。';
+            },
           });
-          const intent = await intentResponse.json();
-          if (!intentResponse.ok) throw new Error(intent.error || '无法创建付款。');
-          elements = stripe.elements({ clientSecret: intent.clientSecret, appearance: { theme: 'stripe' } });
-          paymentElement = elements.create('payment', {
-            fields: { billingDetails: { name: 'never' } },
-          });
-          paymentElement.mount('#payment-element');
+          checkoutElement.hidden = false;
+          checkoutHandle.create('checkout').mount('#checkout-element');
           paymentLoading.hidden = true;
-          paymentForm.hidden = false;
         } catch (error) {
           paymentLoading.textContent = error.message || '付款初始化失败。';
         }
       }
 
+      accountOpen.addEventListener('click', () => openAuth('login'));
+      accountLogout.addEventListener('click', async () => {
+        if (paymentModal.classList.contains('open')) closePaymentModal();
+        try { await requestJson('/api/auth/logout', { method: 'POST', body: '{}' }); } finally { setCurrentUser(null); }
+      });
+      authClose.addEventListener('click', closeAuth);
+      authModal.addEventListener('click', (event) => { if (event.target === authModal) closeAuth(); });
+      authTabs.forEach((tab) => tab.addEventListener('click', () => setAuthMode(tab.dataset.authMode)));
+      authForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        authSubmit.disabled = true;
+        authMessage.textContent = '';
+        try {
+          const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register';
+          const body = await requestJson(endpoint, { method: 'POST', body: JSON.stringify({ email: authEmail.value, password: authPassword.value }) });
+          setCurrentUser(body.user);
+          const plan = pendingPlan;
+          pendingPlan = null;
+          closeAuth();
+          authForm.reset();
+          if (plan) openPayment(plan);
+        } catch (error) {
+          authMessage.textContent = error.message || '账号操作失败，请重试。';
+        } finally {
+          authSubmit.disabled = false;
+        }
+      });
+
       document.querySelectorAll('[data-plan]').forEach((button) => button.addEventListener('click', () => openPayment(button.dataset.plan)));
       paymentClose.addEventListener('click', closePaymentModal);
       paymentModal.addEventListener('click', (event) => { if (event.target === paymentModal) closePaymentModal(); });
-      document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && paymentModal.classList.contains('open')) closePaymentModal(); });
-      paymentForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  if (!stripe || !elements) return;
-
-  paymentSubmit.disabled = true;
-  paymentSubmit.textContent = '正在处理…';
-  paymentError.textContent = '';
-
-  try {
-    const result = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/return.html`,
-        payment_method_data: {
-          billing_details: { name: 'N/A' },
-        },
-      },
-      redirect: 'if_required',
-    });
-
-    if (result.error) {
-      paymentError.textContent =
-        result.error.message || '付款未完成，请检查信息后重试。';
-    } else if (result.paymentIntent?.status === 'succeeded') {
-      paymentError.textContent = '付款成功。';
-    } else if (result.paymentIntent?.status === 'processing') {
-      paymentError.textContent = '付款正在确认中，请稍候查看状态。';
-    } else {
-      paymentError.textContent =
-        `付款状态：${result.paymentIntent?.status || '未完成'}。`;
-    }
-  } catch (error) {
-    console.error('Stripe confirmPayment failed', error);
-    paymentError.textContent = '支付处理出现问题，请重试。';
-  } finally {
-    paymentSubmit.disabled = false;
-    paymentSubmit.textContent = '确认付款';
-  }
-});
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        if (authModal.classList.contains('open')) closeAuth();
+        else if (paymentModal.classList.contains('open')) closePaymentModal();
+      });
       document.querySelectorAll('.nav a').forEach((link) => link.addEventListener('click', () => {
         nav.classList.remove('open');
         menuToggle.setAttribute('aria-expanded', 'false');
       }));
+      loadCurrentUser();
     </script>
   </body>
 </html>

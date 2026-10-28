@@ -1,5 +1,5 @@
 <!doctype html>
-    <html lang="zh-CN">
+<html lang="zh-CN">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,59 +11,30 @@
       #status { line-height: 1.5; }
       .success { color: #147a4b; }
       .error { color: #b42318; }
+      a { color: #2f68f5; }
     </style>
   </head>
   <body>
     <main>
       <h1>付款状态</h1>
       <p id="status">正在确认付款状态…</p>
+      <p><a href="/">返回 Northstar Locate</a></p>
     </main>
     <script>
       const statusNode = document.querySelector('#status');
       const params = new URLSearchParams(window.location.search);
-      const paymentIntentId = params.get('payment_intent');
-      const sessionId = params.get('session_id');
+      const paymentId = params.get('payment');
+      const status = params.get('status');
 
-      async function loadStatus() {
-        if (paymentIntentId) {
-          try {
-            const response = await fetch(`/api/payment-intent-status?payment_intent_id=${encodeURIComponent(paymentIntentId)}`);
-            const body = await response.json();
-            if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
-            if (body.status === 'succeeded') {
-              statusNode.textContent = '付款成功，感谢你的支持。';
-              statusNode.className = 'success';
-            } else {
-              statusNode.textContent = `付款状态：${body.status || '处理中'}。`;
-            }
-          } catch (error) {
-            statusNode.textContent = error.message;
-            statusNode.className = 'error';
-          }
-          return;
-        }
-        if (!sessionId) {
-          statusNode.textContent = '缺少付款编号。';
-          statusNode.className = 'error';
-          return;
-        }
-        try {
-          const response = await fetch(`/api/session-status?session_id=${encodeURIComponent(sessionId)}`);
-          const body = await response.json();
-          if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
-          if (body.paymentStatus === 'paid') {
-            statusNode.textContent = '付款成功，感谢你的支持。';
-            statusNode.className = 'success';
-          } else {
-            statusNode.textContent = `付款状态：${body.paymentStatus || body.status || '处理中'}。`;
-          }
-        } catch (error) {
-          statusNode.textContent = error.message;
-          statusNode.className = 'error';
-        }
+      if (status === 'succeeded') {
+        statusNode.textContent = paymentId ? `付款成功（${paymentId}），订阅状态将在服务器确认后更新。` : '付款成功，订阅状态将在服务器确认后更新。';
+        statusNode.className = 'success';
+      } else if (status === 'failed' || status === 'canceled') {
+        statusNode.textContent = '付款未完成，没有扣款。请返回价格页面重试。';
+        statusNode.className = 'error';
+      } else {
+        statusNode.textContent = '付款仍在处理中，服务器确认后会更新账号状态。';
       }
-
-      loadStatus();
     </script>
   </body>
 </html>

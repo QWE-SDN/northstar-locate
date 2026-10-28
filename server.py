@@ -1,7 +1,8 @@
-"""Small, dependency-light Stripe Payment Element server.
+"""Northstar Locate server with accounts, Whop checkout, and a small admin view.
 
-Stripe secrets stay on the server. The browser receives only the publishable
-key and a short-lived PaymentIntent client secret.
+The default SQLite database is suitable for local development. On Render, point
+DATABASE_PATH at a persistent disk or replace it with a managed database before
+accepting production traffic.
 """
 
 from __future__ import annotations
@@ -12,24 +13,25 @@ import hmac
 import json
 import os
 import re
+import secrets
+import sqlite3
 import time
 from http import HTTPStatus
+from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, urlencode, urlparse
-from urllib.request import Request, urlopen
+from urllib.parse import urlparse
 
 
 ROOT = Path(__file__).resolve().parent
 PUBLIC_DIR = ROOT / "public"
-STRIPE_API = "https://api.stripe.com/v1"
+SESSION_TTL = 30 * 24 * 60 * 60
+PASSWORD_ITERATIONS = 310_000
+EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
 def load_dotenv(path: Path) -> None:
-    """Load simple KEY=VALUE entries without overwriting real environment variables."""
-
     if not path.exists():
         return
     for raw_line in path.read_text(encoding="utf-8").splitlines():
@@ -37,203 +39,286 @@ def load_dotenv(path: Path) -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        os.environ.setdefault(key, value)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
 load_dotenv(ROOT / ".env")
 
 
-def env_int(name: str, default: int) -> int:
+def database_path() -> Path:
+    configured = os.environ.get("DATABASE_PATH", "").strip()
+    return Path(configured) if configured else ROOT / "data" / "northstar.sqlite3"
+
+
+def db_connect() -> sqlite3.Connection:
+    path = database_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(path, timeout=15)
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
+    return connection
+
+
+def init_db() -> None:
+    with db_connect() as db:
+        db.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                subscription_plan TEXT,
+                subscription_status TEXT NOT NULL DEFAULT 'inactive',
+                whop_payment_id TEXT,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS sessions (
+                token TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                expires_at INTEGER NOT NULL,
+                created_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS payments (
+                payment_id TEXT PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                plan TEXT,
+                status TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS webhook_events (
+                event_id TEXT PRIMARY KEY,
+                event_type TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires_at);
+            """
+        )
+
+
+def now() -> int:
+    return int(time.time())
+
+
+def encode_bytes(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+
+
+def decode_bytes(value: str) -> bytes:
+    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, PASSWORD_ITERATIONS)
+    return f"pbkdf2_sha256${PASSWORD_ITERATIONS}${encode_bytes(salt)}${encode_bytes(digest)}"
+
+
+def verify_password(password: str, encoded: str) -> bool:
     try:
-        value = int(os.environ.get(name, str(default)))
-    except ValueError:
-        return default
-    return value if value > 0 else default
+        algorithm, iterations, salt_text, digest_text = encoded.split("$", 3)
+        if algorithm != "pbkdf2_sha256":
+            return False
+        digest = hashlib.pbkdf2_hmac(
+            "sha256", password.encode(), decode_bytes(salt_text), int(iterations)
+        )
+        return hmac.compare_digest(digest, decode_bytes(digest_text))
+    except (ValueError, TypeError):
+        return False
 
 
-def config() -> dict[str, Any]:
-    currency = os.environ.get("STRIPE_CURRENCY", "usd").lower()
-    if not re.fullmatch(r"[a-z]{3}", currency):
-        currency = "usd"
-
-    amount = env_int("STRIPE_AMOUNT", 1999)
-    product_name = os.environ.get("STRIPE_PRODUCT_NAME", "Example digital product")
+def safe_user(row: sqlite3.Row | None) -> dict[str, Any] | None:
+    if row is None:
+        return None
     return {
-        "publishableKey": os.environ.get("STRIPE_PUBLISHABLE_KEY", ""),
-        "amount": amount,
-        "currency": currency,
-        "productName": product_name,
-        "priceId": os.environ.get("STRIPE_PRICE_ID", "").strip(),
-        "plans": {
-            "monthly": {
-                "amount": env_int("STRIPE_MONTHLY_AMOUNT", 9900),
-                "currency": currency,
-                "productName": os.environ.get(
-                    "STRIPE_MONTHLY_PRODUCT_NAME", "Northstar Locate - Monthly plan"
-                ),
-            },
-            "yearly": {
-                "amount": env_int("STRIPE_YEARLY_AMOUNT", 19900),
-                "currency": currency,
-                "productName": os.environ.get(
-                    "STRIPE_YEARLY_PRODUCT_NAME", "Northstar Locate - Yearly plan"
-                ),
-            },
+        "id": row["id"],
+        "email": row["email"],
+        "subscriptionPlan": row["subscription_plan"],
+        "subscriptionStatus": row["subscription_status"],
+    }
+
+
+def create_session(user_id: int) -> str:
+    token = secrets.token_urlsafe(32)
+    timestamp = now()
+    with db_connect() as db:
+        db.execute("DELETE FROM sessions WHERE expires_at < ?", (timestamp,))
+        db.execute(
+            "INSERT INTO sessions(token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)",
+            (token, user_id, timestamp + SESSION_TTL, timestamp),
+        )
+    return token
+
+
+def cookie_value(handler: BaseHTTPRequestHandler, name: str) -> str:
+    cookie = SimpleCookie(handler.headers.get("Cookie", ""))
+    morsel = cookie.get(name)
+    return morsel.value if morsel else ""
+
+
+def user_from_request(handler: BaseHTTPRequestHandler) -> sqlite3.Row | None:
+    token = cookie_value(handler, "northstar_session")
+    if not token:
+        return None
+    with db_connect() as db:
+        return db.execute(
+            """
+            SELECT users.* FROM sessions
+            JOIN users ON users.id = sessions.user_id
+            WHERE sessions.token = ? AND sessions.expires_at > ?
+            """,
+            (token, now()),
+        ).fetchone()
+
+
+def cookie_header(name: str, value: str, max_age: int, secure: bool = True) -> str:
+    flags = f"{name}={value}; Path=/; HttpOnly; SameSite=Lax; Max-Age={max_age}"
+    return f"{flags}; Secure" if secure else flags
+
+
+def request_is_secure(handler: BaseHTTPRequestHandler) -> bool:
+    base = os.environ.get("PUBLIC_BASE_URL", "")
+    return base.lower().startswith("https://") or handler.headers.get("X-Forwarded-Proto", "").lower() == "https"
+
+
+def plan_config() -> dict[str, dict[str, Any]]:
+    return {
+        "monthly": {
+            "planId": os.environ.get("WHOP_MONTHLY_PLAN_ID", "").strip(),
+            "amount": 9900,
+            "currency": "usd",
+            "productName": "Northstar Locate - Monthly plan",
+            "label": "$99.00 / 月",
+        },
+        "yearly": {
+            "planId": os.environ.get("WHOP_YEARLY_PLAN_ID", "").strip(),
+            "amount": 19900,
+            "currency": "usd",
+            "productName": "Northstar Locate - Yearly plan",
+            "label": "$199.00 / 年",
         },
     }
 
 
-class StripeAPIError(RuntimeError):
-    def __init__(self, status: int, message: str):
-        super().__init__(message)
-        self.status = status
-        self.message = message
+def app_config() -> dict[str, Any]:
+    return {"plans": plan_config()}
 
 
-def stripe_request(
-    method: str,
-    path: str,
-    params: dict[str, str] | None = None,
-    idempotency_key: str | None = None,
-) -> dict[str, Any]:
-    secret = os.environ.get("STRIPE_SECRET_KEY", "")
+def checkout_signing_secret() -> str:
+    return os.environ.get("WHOP_CHECKOUT_SIGNING_SECRET", "").strip()
+
+
+def sign_checkout_token(user: sqlite3.Row, plan: str) -> str:
+    secret = checkout_signing_secret()
     if not secret:
-        raise StripeAPIError(500, "STRIPE_SECRET_KEY is not configured on the server")
-
-    token = base64.b64encode(f"{secret}:".encode("utf-8")).decode("ascii")
-    body = None
-    headers = {
-        "Authorization": f"Basic {token}",
-        "User-Agent": "stripe-checkout-elements-demo/1.0",
+        raise RuntimeError("WHOP_CHECKOUT_SIGNING_SECRET is not configured")
+    payload = {
+        "userId": user["id"],
+        "email": user["email"],
+        "plan": plan,
+        # Keep the signed metadata valid long enough for a delayed webhook retry.
+        "expiresAt": now() + 24 * 60 * 60,
     }
-    if params is not None:
-        body = urlencode(params).encode("utf-8")
-        headers["Content-Type"] = "application/x-www-form-urlencoded"
-    if idempotency_key:
-        headers["Idempotency-Key"] = idempotency_key[:255]
+    body = encode_bytes(json.dumps(payload, separators=(",", ":")).encode())
+    signature = encode_bytes(hmac.new(secret.encode(), body.encode(), hashlib.sha256).digest())
+    return f"{body}.{signature}"
 
-    request = Request(f"{STRIPE_API}{path}", data=body, headers=headers, method=method)
+
+def verify_checkout_token(token: str) -> dict[str, Any] | None:
+    secret = checkout_signing_secret()
     try:
-        with urlopen(request, timeout=20) as response:
-            payload = response.read().decode("utf-8")
-    except HTTPError as exc:
-        payload = exc.read().decode("utf-8", errors="replace")
-        try:
-            error = json.loads(payload).get("error", {})
-            message = error.get("message", payload)
-        except (ValueError, AttributeError):
-            message = payload
-        raise StripeAPIError(exc.code, str(message)) from exc
-    except URLError as exc:
-        raise StripeAPIError(502, f"Stripe API connection failed: {exc.reason}") from exc
+        body, signature = token.split(".", 1)
+        expected = encode_bytes(hmac.new(secret.encode(), body.encode(), hashlib.sha256).digest())
+        if not secret or not hmac.compare_digest(expected, signature):
+            return None
+        payload = json.loads(decode_bytes(body).decode("utf-8"))
+        if int(payload["expiresAt"]) < now() or payload["plan"] not in plan_config():
+            return None
+        return payload
+    except (ValueError, KeyError, TypeError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
 
+
+def verify_whop_signature(payload: bytes, headers: Any) -> bool:
+    secret = os.environ.get("WHOP_WEBHOOK_SECRET", "").strip()
+    webhook_id = headers.get("webhook-id", "")
+    timestamp = headers.get("webhook-timestamp", "")
+    signatures = headers.get("webhook-signature", "")
+    if not secret or not webhook_id or not timestamp or not signatures:
+        return False
     try:
-        return json.loads(payload)
-    except json.JSONDecodeError as exc:
-        raise StripeAPIError(502, "Stripe API returned invalid JSON") from exc
+        if abs(time.time() - int(timestamp)) > 300:
+            return False
+        # Whop signs with the complete ws_ secret as UTF-8 bytes.
+        key = secret.encode("utf-8")
+        signed = f"{webhook_id}.{timestamp}.".encode("utf-8") + payload
+        expected = base64.b64encode(hmac.new(key, signed, hashlib.sha256).digest()).decode("ascii")
+        candidates = [item[3:] for item in signatures.split() if item.startswith("v1,")]
+        return any(hmac.compare_digest(expected, candidate) for candidate in candidates)
+    except (ValueError, IndexError, TypeError):
+        return False
 
 
-def create_checkout_session(
-    idempotency_key: str | None,
-    origin: str,
-) -> dict[str, Any]:
-    settings = config()
-    if not settings["publishableKey"].startswith("pk_"):
-        raise StripeAPIError(500, "STRIPE_PUBLISHABLE_KEY is not configured correctly")
-
-    params: dict[str, str] = {
-        "ui_mode": "elements",
-        "mode": "payment",
-        "return_url": f"{origin.rstrip('/')}/return.html?session_id={{CHECKOUT_SESSION_ID}}",
-        "line_items[0][quantity]": "1",
-    }
-    if settings["priceId"]:
-        params["line_items[0][price]"] = settings["priceId"]
-    else:
-        params.update(
-            {
-                "line_items[0][price_data][currency]": settings["currency"],
-                "line_items[0][price_data][unit_amount]": str(settings["amount"]),
-                "line_items[0][price_data][product_data][name]": settings["productName"],
-            }
+def handle_whop_event(event: dict[str, Any]) -> None:
+    event_id = str(event.get("id", ""))
+    event_type = str(event.get("type", ""))
+    data = event.get("data") or {}
+    if not event_id:
+        return
+    with db_connect() as db:
+        if db.execute("SELECT 1 FROM webhook_events WHERE event_id = ?", (event_id,)).fetchone():
+            return
+        db.execute(
+            "INSERT INTO webhook_events(event_id, event_type, created_at) VALUES (?, ?, ?)",
+            (event_id, event_type, now()),
         )
-
-    payload = stripe_request("POST", "/checkout/sessions", params, idempotency_key)
-    client_secret = payload.get("client_secret")
-    if not client_secret:
-        raise StripeAPIError(502, "Stripe did not return a Checkout Session client secret")
-    return {"clientSecret": client_secret, "sessionId": payload.get("id")}
-
-
-def create_payment_intent(
-    plan_id: str,
-    idempotency_key: str | None,
-) -> dict[str, Any]:
-    """Create a server-priced PaymentIntent for one of the published plans."""
-
-    settings = config()
-    plan = settings["plans"].get(plan_id)
-    if not plan:
-        raise StripeAPIError(400, "Unknown payment plan")
-    if not settings["publishableKey"].startswith("pk_"):
-        raise StripeAPIError(500, "STRIPE_PUBLISHABLE_KEY is not configured correctly")
-
-    params = {
-        "amount": str(plan["amount"]),
-        "currency": plan["currency"],
-        "automatic_payment_methods[enabled]": "true",
-        "description": plan["productName"],
-        "metadata[plan_id]": plan_id,
-    }
-    payload = stripe_request("POST", "/payment_intents", params, idempotency_key)
-    client_secret = payload.get("client_secret")
-    if not client_secret:
-        raise StripeAPIError(502, "Stripe did not return a PaymentIntent client secret")
-    return {
-        "clientSecret": client_secret,
-        "paymentIntentId": payload.get("id"),
-        "amount": plan["amount"],
-        "currency": plan["currency"],
-        "productName": plan["productName"],
-    }
-
-
-def verify_webhook_signature(payload: bytes, signature: str, secret: str) -> bool:
-    values: dict[str, list[str]] = {}
-    for item in signature.split(","):
-        key, separator, value = item.partition("=")
-        if separator:
-            values.setdefault(key, []).append(value)
-
-    timestamps = values.get("t", [])
-    signatures = values.get("v1", [])
-    if not timestamps or not signatures:
-        return False
-    try:
-        timestamp = int(timestamps[0])
-    except ValueError:
-        return False
-    if abs(time.time() - timestamp) > 300:
-        return False
-
-    signed_payload = f"{timestamp}.".encode("utf-8") + payload
-    expected = hmac.new(secret.encode("utf-8"), signed_payload, hashlib.sha256).hexdigest()
-    return any(hmac.compare_digest(expected, candidate) for candidate in signatures)
+        if event_type not in {"payment.succeeded", "payment.failed", "payment.canceled"}:
+            return
+        payment_id = str(data.get("id", event_id))
+        metadata = data.get("metadata") or {}
+        token_payload = verify_checkout_token(str(metadata.get("northstar_checkout_token", "")))
+        if not token_payload:
+            print(f"Whop event {event_id} has no valid Northstar checkout token")
+            return
+        user = db.execute("SELECT * FROM users WHERE id = ?", (int(token_payload["userId"]),)).fetchone()
+        if user is None or user["email"] != token_payload["email"]:
+            print(f"Whop event {event_id} references an unknown account")
+            return
+        status = {
+            "payment.succeeded": "active",
+            "payment.failed": "payment_failed",
+            "payment.canceled": "canceled",
+        }[event_type]
+        db.execute(
+            """
+            INSERT OR REPLACE INTO payments(payment_id, user_id, plan, status, payload, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (payment_id, user["id"], token_payload["plan"], status, json.dumps(data), now()),
+        )
+        db.execute(
+            """
+            UPDATE users SET subscription_plan = ?, subscription_status = ?,
+                whop_payment_id = ?, updated_at = ? WHERE id = ?
+            """,
+            (token_payload["plan"], status, payment_id, now(), user["id"]),
+        )
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "StripeCheckoutElementsDemo/1.0"
+    server_version = "NorthstarLocate/2.0"
 
     def log_message(self, format: str, *args: Any) -> None:
         print(f"[{self.log_date_time_string()}] {format % args}")
 
-    def send_json(self, status: int, payload: dict[str, Any]) -> None:
+    def send_json(self, status: int, payload: dict[str, Any], cookies: list[str] | None = None) -> None:
         encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
+        for cookie in cookies or []:
+            self.send_header("Set-Cookie", cookie)
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         self.wfile.write(encoded)
@@ -249,81 +334,71 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         if length > 64 * 1024:
             raise ValueError("request body is too large")
-        raw = self.rfile.read(length) if length else b"{}"
-        value = json.loads(raw.decode("utf-8"))
+        value = json.loads(self.rfile.read(length).decode("utf-8") if length else "{}")
         if not isinstance(value, dict):
             raise ValueError("request body must be a JSON object")
         return value
 
-    def origin(self) -> str:
-        configured = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
-        if configured:
-            return configured
-        host = self.headers.get("Host", "localhost:4243")
-        return f"http://{host}"
+    def require_user(self) -> sqlite3.Row | None:
+        return user_from_request(self)
+
+    def admin_ok(self) -> bool:
+        password = os.environ.get("ADMIN_PASSWORD", "")
+        token = cookie_value(self, "northstar_admin")
+        if not password or not token:
+            return False
+        try:
+            timestamp_text, signature = decode_bytes(token).decode().split(".", 1)
+            timestamp = int(timestamp_text)
+            expected = hmac.new(password.encode(), timestamp_text.encode(), hashlib.sha256).hexdigest()
+            return now() - timestamp < SESSION_TTL and hmac.compare_digest(expected, signature)
+        except (ValueError, TypeError, UnicodeDecodeError):
+            return False
 
     def do_OPTIONS(self) -> None:
         self.send_response(HTTPStatus.NO_CONTENT)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key, Stripe-Signature")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.end_headers()
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         if parsed.path == "/api/config":
-            settings = config()
-            self.send_json(
-                HTTPStatus.OK,
+            self.send_json(HTTPStatus.OK, app_config())
+            return
+        if parsed.path == "/api/auth/me":
+            user = self.require_user()
+            self.send_json(HTTPStatus.OK, {"authenticated": user is not None, "user": safe_user(user)})
+            return
+        if parsed.path == "/api/admin/users":
+            if not self.admin_ok():
+                self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "admin authentication required"})
+                return
+            with db_connect() as db:
+                rows = db.execute(
+                    """
+                    SELECT email, subscription_plan, subscription_status, whop_payment_id,
+                           created_at, updated_at FROM users ORDER BY created_at DESC
+                    """
+                ).fetchall()
+            users = [
                 {
-                    "publishableKey": settings["publishableKey"],
-                    "amount": settings["amount"],
-                    "currency": settings["currency"],
-                    "productName": settings["productName"],
-                    "priceId": settings["priceId"],
-                    "plans": settings["plans"],
-                },
-            )
-            return
-
-        if parsed.path == "/api/payment-intent-status":
-            payment_intent_id = parse_qs(parsed.query).get("payment_intent_id", [""])[0]
-            if not re.fullmatch(r"pi_[A-Za-z0-9_]+", payment_intent_id):
-                self.send_json(HTTPStatus.BAD_REQUEST, {"error": "invalid payment_intent_id"})
-                return
-            try:
-                payment_intent = stripe_request("GET", f"/payment_intents/{payment_intent_id}")
-                self.send_json(
-                    HTTPStatus.OK,
-                    {
-                        "status": payment_intent.get("status"),
-                        "amount": payment_intent.get("amount"),
-                        "currency": payment_intent.get("currency"),
-                    },
-                )
-            except StripeAPIError as exc:
-                self.send_json(exc.status, {"error": exc.message})
-            return
-
-        if parsed.path == "/api/session-status":
-            session_id = parse_qs(parsed.query).get("session_id", [""])[0]
-            if not re.fullmatch(r"cs_[A-Za-z0-9_]+", session_id):
-                self.send_json(HTTPStatus.BAD_REQUEST, {"error": "invalid session_id"})
-                return
-            try:
-                session = stripe_request("GET", f"/checkout/sessions/{session_id}")
-                self.send_json(
-                    HTTPStatus.OK,
-                    {
-                        "status": session.get("status"),
-                        "paymentStatus": session.get("payment_status"),
-                    },
-                )
-            except StripeAPIError as exc:
-                self.send_json(exc.status, {"error": exc.message})
+                    "email": row["email"],
+                    "subscriptionPlan": row["subscription_plan"],
+                    "subscriptionStatus": row["subscription_status"],
+                    "whopPaymentId": row["whop_payment_id"],
+                    "createdAt": row["created_at"],
+                    "updatedAt": row["updated_at"],
+                }
+                for row in rows
+            ]
+            self.send_json(HTTPStatus.OK, {"users": users})
             return
 
         relative = parsed.path.lstrip("/") or "index.html"
+        if relative == "admin":
+            relative = "admin.html"
         candidate = (PUBLIC_DIR / relative).resolve()
         if PUBLIC_DIR not in candidate.parents and candidate != PUBLIC_DIR:
             self.send_text(HTTPStatus.NOT_FOUND, b"Not found", "text/plain; charset=utf-8")
@@ -342,66 +417,116 @@ class Handler(BaseHTTPRequestHandler):
             ".svg": "image/svg+xml",
             ".ico": "image/x-icon",
         }
-        content_type = content_types.get(candidate.suffix.lower(), "application/octet-stream")
-        self.send_text(HTTPStatus.OK, candidate.read_bytes(), content_type)
+        self.send_text(HTTPStatus.OK, candidate.read_bytes(), content_types.get(candidate.suffix.lower(), "application/octet-stream"))
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
-        if parsed.path == "/api/create-payment-intent":
-            try:
-                body = self.read_json()
-                plan_id = str(body.get("planId", "")).strip()
-                result = create_payment_intent(
-                    plan_id,
-                    self.headers.get("Idempotency-Key"),
-                )
-                self.send_json(HTTPStatus.OK, result)
-            except (ValueError, json.JSONDecodeError) as exc:
-                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            except StripeAPIError as exc:
-                self.send_json(exc.status, {"error": exc.message})
-            return
-
-        if parsed.path == "/api/create-checkout-session":
-            try:
-                self.read_json()
-                result = create_checkout_session(self.headers.get("Idempotency-Key"), self.origin())
-                self.send_json(HTTPStatus.OK, result)
-            except (ValueError, json.JSONDecodeError) as exc:
-                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            except StripeAPIError as exc:
-                self.send_json(exc.status, {"error": exc.message})
-            return
-
-        if parsed.path == "/webhook":
+        if parsed.path in {"/webhook", "/api/webhooks/whop"}:
             payload = self.rfile.read(int(self.headers.get("Content-Length", "0")))
-            secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
-            signature = self.headers.get("Stripe-Signature", "")
-            if not secret or not verify_webhook_signature(payload, signature, secret):
-                self.send_json(HTTPStatus.BAD_REQUEST, {"error": "invalid webhook signature"})
+            if not verify_whop_signature(payload, self.headers):
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": "invalid Whop webhook signature"})
                 return
             try:
-                event = json.loads(payload.decode("utf-8"))
-            except json.JSONDecodeError:
-                self.send_json(HTTPStatus.BAD_REQUEST, {"error": "invalid JSON"})
+                handle_whop_event(json.loads(payload.decode("utf-8")))
+            except (json.JSONDecodeError, TypeError) as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
                 return
-            event_type = event.get("type", "unknown")
-            event_id = event.get("id", "unknown")
-            print(f"Stripe webhook received: {event_type} ({event_id})")
-            # Add fulfillment, subscription, or order-state updates here.  Always
-            # acknowledge only after signature verification and parsing succeed.
             self.send_json(HTTPStatus.OK, {"received": True})
+            return
+        try:
+            body = self.read_json()
+        except (ValueError, json.JSONDecodeError) as exc:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+
+        if parsed.path == "/api/auth/register":
+            email = str(body.get("email", "")).strip().lower()
+            password = str(body.get("password", ""))
+            if not EMAIL_RE.fullmatch(email):
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": "请输入有效邮箱地址。"})
+                return
+            if len(password) < 8:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": "密码至少需要 8 位。"})
+                return
+            timestamp = now()
+            try:
+                with db_connect() as db:
+                    cursor = db.execute(
+                        "INSERT INTO users(email, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                        (email, hash_password(password), timestamp, timestamp),
+                    )
+                    user_id = cursor.lastrowid
+                    user = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+            except sqlite3.IntegrityError:
+                self.send_json(HTTPStatus.CONFLICT, {"error": "该邮箱已经注册，请直接登录。"})
+                return
+            token = create_session(int(user_id))
+            self.send_json(HTTPStatus.OK, {"user": safe_user(user)}, [cookie_header("northstar_session", token, SESSION_TTL, request_is_secure(self))])
+            return
+
+        if parsed.path == "/api/auth/login":
+            email = str(body.get("email", "")).strip().lower()
+            password = str(body.get("password", ""))
+            with db_connect() as db:
+                user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+            if user is None or not verify_password(password, user["password_hash"]):
+                self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "邮箱或密码不正确。"})
+                return
+            token = create_session(user["id"])
+            self.send_json(HTTPStatus.OK, {"user": safe_user(user)}, [cookie_header("northstar_session", token, SESSION_TTL, request_is_secure(self))])
+            return
+
+        if parsed.path == "/api/auth/logout":
+            token = cookie_value(self, "northstar_session")
+            if token:
+                with db_connect() as db:
+                    db.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            self.send_json(HTTPStatus.OK, {"ok": True}, [cookie_header("northstar_session", "", 0, request_is_secure(self))])
+            return
+
+        if parsed.path == "/api/whop-checkout-token":
+            user = self.require_user()
+            if user is None:
+                self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "请先登录。"})
+                return
+            plan = str(body.get("planId", "")).strip()
+            settings = plan_config().get(plan)
+            if not settings or not settings["planId"]:
+                self.send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "该 Whop 套餐尚未配置。"})
+                return
+            try:
+                token = sign_checkout_token(user, plan)
+            except RuntimeError as exc:
+                self.send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(exc)})
+                return
+            self.send_json(HTTPStatus.OK, {"planId": settings["planId"], "token": token, "email": user["email"]})
+            return
+
+        if parsed.path == "/api/admin/login":
+            password = str(body.get("password", ""))
+            configured = os.environ.get("ADMIN_PASSWORD", "")
+            if not configured:
+                self.send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "ADMIN_PASSWORD 未配置。"})
+                return
+            if not hmac.compare_digest(password, configured):
+                self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "后台密码不正确。"})
+                return
+            timestamp_text = str(now())
+            signature = hmac.new(configured.encode(), timestamp_text.encode(), hashlib.sha256).hexdigest()
+            token = encode_bytes(f"{timestamp_text}.{signature}".encode())
+            self.send_json(HTTPStatus.OK, {"ok": True}, [cookie_header("northstar_admin", token, SESSION_TTL, request_is_secure(self))])
             return
 
         self.send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
 
 def main() -> None:
+    init_db()
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "4243"))
     server = ThreadingHTTPServer((host, port), Handler)
     print(f"Northstar Locate site listening at http://{host}:{port}")
-    print("Stripe Payment Element endpoints are ready; configure Stripe keys before accepting payments.")
+    print("Account registration, Whop checkout, and admin endpoints are ready.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
