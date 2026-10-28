@@ -1,0 +1,247 @@
+[
+  {
+    "slug": "terms-of-service",
+    "shortTitle": "Terms of Service",
+    "title": "NorthStar Locate – Terms of Service",
+    "updated": "Last updated: October 28, 2026",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "text": "These Terms of Service (\"Terms\") govern your use of NorthStar Locate (the \"Service\"), operated by Devren Consu Inc (\"we\", \"us\"). By using the Service, you agree to these Terms."
+      },
+      {
+        "type": "heading",
+        "text": "1. The Service"
+      },
+      {
+        "type": "paragraph",
+        "text": "NorthStar Locate lets you request to view the current location of a family member or friend. A person's location is shown to you only after that person has received your request and approved it."
+      },
+      {
+        "type": "heading",
+        "text": "2. Eligibility"
+      },
+      {
+        "type": "paragraph",
+        "text": "You must be at least 18 years old to use the Service. We do not knowingly allow use by anyone under 18."
+      },
+      {
+        "type": "heading",
+        "text": "3. Consent requirement"
+      },
+      {
+        "type": "bullets",
+        "items": [
+          "You may only request the location of people you know, and only for the purpose of staying connected and safe.",
+          "You must not track, monitor, or locate anyone without their knowledge and approval.",
+          "The person you request can decline or withdraw consent at any time, and the Service will stop showing their location immediately."
+        ]
+      },
+      {
+        "type": "heading",
+        "text": "4. Prohibited use"
+      },
+      {
+        "type": "paragraph",
+        "text": "You agree not to use the Service to stalk, harass, or surveil anyone, to circumvent a person's refusal or withdrawal of consent, or to break any law. We may suspend or terminate accounts that violate these Terms."
+      },
+      {
+        "type": "heading",
+        "text": "5. Subscriptions and billing"
+      },
+      {
+        "type": "bullets",
+        "items": [
+          "Plans: Monthly at $99.00 USD per month, or Yearly at $199.00 USD per year, plus any applicable taxes.",
+          "Subscriptions renew automatically at the end of each billing period until canceled.",
+          "Payments are processed by Whop."
+        ]
+      },
+      {
+        "type": "heading",
+        "text": "6. Cancellation and refunds"
+      },
+      {
+        "type": "paragraph",
+        "text": "You can cancel at any time. After you cancel, your access continues until the end of the current paid period and you will not be charged again. Payments are non-refundable. See our Refund and Cancellation Policy."
+      },
+      {
+        "type": "heading",
+        "text": "7. Emergencies"
+      },
+      {
+        "type": "paragraph",
+        "text": "The Service is not an emergency service and does not replace contacting emergency services. Location information may be delayed or inaccurate."
+      },
+      {
+        "type": "heading",
+        "text": "8. Disclaimer and limitation of liability"
+      },
+      {
+        "type": "paragraph",
+        "text": "The Service is provided \"as is\" without warranties. To the maximum extent permitted by law, Devren Consu Inc is not liable for indirect or consequential damages arising from use of the Service."
+      },
+      {
+        "type": "heading",
+        "text": "9. Changes"
+      },
+      {
+        "type": "paragraph",
+        "text": "We may update these Terms. Continued use after an update means you accept the new Terms."
+      },
+      {
+        "type": "heading",
+        "text": "10. Contact"
+      },
+      {
+        "type": "paragraph",
+        "text": "Devren Consu Inc, rochelledevot@gmail.com"
+      }
+    ]
+  },
+  {
+    "slug": "privacy-policy",
+    "shortTitle": "Privacy Policy",
+    "title": "NorthStar Locate – Privacy Policy",
+    "updated": "Last updated: October 28, 2026",
+    "blocks": [
+      {
+        "type": "paragraph",
+        "text": "Devren Consu Inc (\"we\", \"us\") operates NorthStar Locate. This policy explains what information we collect and how we use it."
+      },
+      {
+        "type": "heading",
+        "text": "1. Information we collect"
+      },
+      {
+        "type": "bullets",
+        "items": [
+          "Account information: your email address and phone number.",
+          "Phone numbers you enter to send location requests.",
+          "Current location: collected only from a person who has approved a request, and only while that approval is active.",
+          "Payment information is handled by our payment provider, Whop. We do not store full card details."
+        ]
+      },
+      {
+        "type": "heading",
+        "text": "2. How we use information"
+      },
+      {
+        "type": "paragraph",
+        "text": "To operate the Service, send location requests, show an approved person's current location to the requester, process payments, prevent misuse, and respond to support requests."
+      },
+      {
+        "type": "heading",
+        "text": "3. Location data"
+      },
+      {
+        "type": "bullets",
+        "items": [
+          "We show current location only. We do not store location history.",
+          "Location is shared only after the person approves the request. They can withdraw approval at any time, and sharing stops immediately."
+        ]
+      },
+      {
+        "type": "heading",
+        "text": "4. Sharing of information"
+      },
+      {
+        "type": "paragraph",
+        "text": "We do not sell personal information. We share information only with service providers needed to run the Service (such as payment processing and hosting), or when required by law."
+      },
+      {
+        "type": "heading",
+        "text": "5. Data retention and deletion"
+      },
+      {
+        "type": "paragraph",
+        "text": "We keep account information while your account is active. You can ask us to delete your account and associated data by emailing us."
+      },
+      {
+        "type": "heading",
+        "text": "6. Security"
+      },
+      {
+        "type": "paragraph",
+        "text": "We use reasonable safeguards to protect information, but no system is completely secure."
+      },
+      {
+        "type": "heading",
+        "text": "7. Age requirement"
+      },
+      {
+        "type": "paragraph",
+        "text": "The Service is for people 18 and older. We do not knowingly collect information from anyone under 18, and will delete it if we learn we have."
+      },
+      {
+        "type": "heading",
+        "text": "8. Your choices"
+      },
+      {
+        "type": "paragraph",
+        "text": "You may request access to, correction of, or deletion of your information by emailing us."
+      },
+      {
+        "type": "heading",
+        "text": "9. Changes"
+      },
+      {
+        "type": "paragraph",
+        "text": "We may update this policy and will change the date above when we do."
+      },
+      {
+        "type": "heading",
+        "text": "10. Contact"
+      },
+      {
+        "type": "paragraph",
+        "text": "Devren Consu Inc, rochelledevot@gmail.com"
+      }
+    ]
+  },
+  {
+    "slug": "refund-and-cancellation-policy",
+    "shortTitle": "Refund and Cancellation Policy",
+    "title": "NorthStar Locate – Refund and Cancellation Policy",
+    "updated": "Last updated: October 28, 2026",
+    "blocks": [
+      {
+        "type": "heading",
+        "text": "Cancellation"
+      },
+      {
+        "type": "bullets",
+        "items": [
+          "You can cancel your subscription at any time.",
+          "After you cancel, you keep access until the end of the billing period you already paid for (the current month for Monthly, the current year for Yearly).",
+          "You will not be charged again after cancellation.",
+          "To cancel, use the cancel option in your Whop account, or email rochelledevot@gmail.com and we will cancel it for you."
+        ]
+      },
+      {
+        "type": "heading",
+        "text": "Renewals"
+      },
+      {
+        "type": "paragraph",
+        "text": "Subscriptions renew automatically each month ($99.00 USD) or each year ($199.00 USD), plus applicable taxes, until you cancel. Cancel before the renewal date to avoid the next charge."
+      },
+      {
+        "type": "heading",
+        "text": "Refunds"
+      },
+      {
+        "type": "paragraph",
+        "text": "All payments are final and non-refundable, including partial periods and unused time after cancellation. If you believe you were charged in error, contact rochelledevot@gmail.com and we will review it."
+      },
+      {
+        "type": "heading",
+        "text": "Contact"
+      },
+      {
+        "type": "paragraph",
+        "text": "Devren Consu Inc, rochelledevot@gmail.com"
+      }
+    ]
+  }
+]

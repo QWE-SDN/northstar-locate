@@ -175,7 +175,20 @@ window.NorthstarMessages = {
     "mail.intro": "请在注册页面输入以下验证码：",
     "mail.expiry": "验证码在 10 分钟内有效。",
     "mail.ignore": "若非本人操作，请忽略此邮件。",
-    "site.tagline": "Northstar Locate / 找到下一步"
+    "site.tagline": "Northstar Locate / 找到下一步",
+    "footer.refunds": "退款与取消政策",
+    "legal.skip": "跳至正文",
+    "legal.home": "返回网站",
+    "legal.download": "下载 PDF",
+    "legal.english": "政策文件以英文提供。",
+    "legal.contents": "本页目录",
+    "legal.all": "所有法律文件",
+    "legal.description.terms-of-service": "服务规则、同意要求、订阅和账单。",
+    "legal.description.privacy-policy": "信息收集、位置数据、保留期限及你的选择。",
+    "legal.description.refund-and-cancellation-policy": "取消订阅、自动续费和退款政策。",
+    "legal.read": "在线阅读",
+    "legal.intro": "在这里查看我们的条款与政策，也可以下载保存。",
+    "legal.questions": "对政策有疑问？"
   },
   "en": {
     "site.title": "Northstar Locate · Find your way",
@@ -353,7 +366,20 @@ window.NorthstarMessages = {
     "mail.intro": "Enter this code on the sign-up page:",
     "mail.expiry": "This code expires in 10 minutes.",
     "mail.ignore": "If you did not request this, ignore this email.",
-    "site.tagline": "Northstar Locate / find the next step"
+    "site.tagline": "Northstar Locate / find the next step",
+    "footer.refunds": "Refunds & cancellation",
+    "legal.skip": "Skip to content",
+    "legal.home": "Back to website",
+    "legal.download": "Download PDF",
+    "legal.english": "Policy documents are provided in English.",
+    "legal.contents": "On this page",
+    "legal.all": "All legal documents",
+    "legal.description.terms-of-service": "Service rules, consent requirements, subscriptions, and billing.",
+    "legal.description.privacy-policy": "Information collection, location data, retention, and your choices.",
+    "legal.description.refund-and-cancellation-policy": "Cancellation, automatic renewals, and the refund policy.",
+    "legal.read": "Read policy",
+    "legal.intro": "Our terms and policies, together in one place. Read online or download a copy.",
+    "legal.questions": "Questions about our policies?"
   },
   "ja": {
     "site.title": "Northstar Locate · 次の一歩へ",
@@ -531,7 +557,20 @@ window.NorthstarMessages = {
     "mail.intro": "登録画面に次の認証コードを入力してください：",
     "mail.expiry": "このコードは 10 分間有効です。",
     "mail.ignore": "お心当たりがない場合は、このメールを無視してください。",
-    "site.tagline": "Northstar Locate / 次の一歩へ"
+    "site.tagline": "Northstar Locate / 次の一歩へ",
+    "footer.refunds": "返金・解約ポリシー",
+    "legal.skip": "本文へ移動",
+    "legal.home": "サイトに戻る",
+    "legal.download": "PDF をダウンロード",
+    "legal.english": "ポリシー文書は英語で掲載されています。",
+    "legal.contents": "目次",
+    "legal.all": "すべての法的文書",
+    "legal.description.terms-of-service": "サービスの利用規則、同意要件、サブスクリプション、請求について。",
+    "legal.description.privacy-policy": "情報の収集、位置データ、保存期間、利用者の選択について。",
+    "legal.description.refund-and-cancellation-policy": "解約、自動更新、返金ポリシーについて。",
+    "legal.read": "ポリシーを読む",
+    "legal.intro": "利用規約とポリシーをまとめています。オンラインで読むか、ダウンロードして保存できます。",
+    "legal.questions": "ポリシーに関するお問い合わせ"
   },
   "ko": {
     "site.title": "Northstar Locate · 다음 단계로",
@@ -709,7 +748,20 @@ window.NorthstarMessages = {
     "mail.intro": "가입 화면에 다음 인증번호를 입력하세요:",
     "mail.expiry": "이 인증번호는 10분간 유효합니다.",
     "mail.ignore": "본인이 요청하지 않았다면 이 이메일을 무시하세요.",
-    "site.tagline": "Northstar Locate / 다음 단계로"
+    "site.tagline": "Northstar Locate / 다음 단계로",
+    "footer.refunds": "환불 및 취소 정책",
+    "legal.skip": "본문으로 이동",
+    "legal.home": "웹사이트로 돌아가기",
+    "legal.download": "PDF 다운로드",
+    "legal.english": "정책 문서는 영어로 제공됩니다.",
+    "legal.contents": "목차",
+    "legal.all": "모든 법적 문서",
+    "legal.description.terms-of-service": "서비스 규칙, 동의 요건, 구독 및 결제에 관한 내용입니다.",
+    "legal.description.privacy-policy": "정보 수집, 위치 데이터, 보관 및 이용자의 선택에 관한 내용입니다.",
+    "legal.description.refund-and-cancellation-policy": "구독 취소, 자동 갱신 및 환불 정책에 관한 내용입니다.",
+    "legal.read": "정책 읽기",
+    "legal.intro": "이용약관과 정책을 한곳에서 확인하세요. 온라인으로 읽거나 다운로드할 수 있습니다.",
+    "legal.questions": "정책에 관해 궁금한 점이 있으신가요?"
   },
   "ms": {
     "site.title": "Northstar Locate · Cari arah anda",
@@ -887,6 +939,19 @@ window.NorthstarMessages = {
     "mail.intro": "Masukkan kod ini pada halaman pendaftaran:",
     "mail.expiry": "Kod ini sah selama 10 minit.",
     "mail.ignore": "Jika anda tidak membuat permintaan ini, abaikan e-mel ini.",
-    "site.tagline": "Northstar Locate / cari langkah seterusnya"
+    "site.tagline": "Northstar Locate / cari langkah seterusnya",
+    "footer.refunds": "Bayaran balik & pembatalan",
+    "legal.skip": "Langkau ke kandungan",
+    "legal.home": "Kembali ke laman web",
+    "legal.download": "Muat turun PDF",
+    "legal.english": "Dokumen polisi disediakan dalam bahasa Inggeris.",
+    "legal.contents": "Pada halaman ini",
+    "legal.all": "Semua dokumen undang-undang",
+    "legal.description.terms-of-service": "Peraturan perkhidmatan, keperluan persetujuan, langganan dan pengebilan.",
+    "legal.description.privacy-policy": "Pengumpulan maklumat, data lokasi, penyimpanan dan pilihan anda.",
+    "legal.description.refund-and-cancellation-policy": "Pembatalan, pembaharuan automatik dan polisi bayaran balik.",
+    "legal.read": "Baca polisi",
+    "legal.intro": "Terma dan polisi kami di satu tempat. Baca dalam talian atau muat turun salinan.",
+    "legal.questions": "Ada soalan tentang polisi kami?"
   }
 };

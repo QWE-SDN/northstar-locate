@@ -654,6 +654,8 @@ class Handler(BaseHTTPRequestHandler):
         relative = parsed.path.lstrip("/") or "index.html"
         if relative == "admin":
             relative = "admin.html"
+        if relative in {"legal", "legal/"}:
+            relative = "legal.html"
         candidate = (PUBLIC_DIR / relative).resolve()
         if PUBLIC_DIR not in candidate.parents and candidate != PUBLIC_DIR:
             self.send_text(HTTPStatus.NOT_FOUND, b"Not found", "text/plain; charset=utf-8")
@@ -671,6 +673,7 @@ class Handler(BaseHTTPRequestHandler):
             ".png": "image/png",
             ".svg": "image/svg+xml",
             ".ico": "image/x-icon",
+            ".pdf": "application/pdf",
         }
         self.send_text(HTTPStatus.OK, candidate.read_bytes(), content_types.get(candidate.suffix.lower(), "application/octet-stream"))
 
