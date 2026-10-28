@@ -90,7 +90,7 @@ EMAIL_FROM=Northstar Locate <verify@northstarlocate.com>
 
 `EMAIL_FROM` 必须使用 Resend 已验证域名下的地址；保留现有 `WHOP_CHECKOUT_SIGNING_SECRET`，网站复用它来保护验证码摘要，不需要新增随机密钥。
 
-新用户填写邮箱和 8 至 128 位密码后，先收到验证码，再在原弹窗输入验证码；通过后自动登录，并继续之前选择的付款方案。
+新用户填写邮箱和 6 至 20 个字符的密码后，先收到验证码，再在原弹窗输入验证码；通过后自动登录，并继续之前选择的付款方案。
 
 验证码 10 分钟有效，60 秒后才能重发，每个验证码最多尝试 5 次。每邮箱每小时最多发送 5 次，每来源每小时 20 次，全站每小时 100 次。重发成功后旧验证码失效，重发失败时已收到且未过期的旧验证码仍可使用；注册验证窗口最长保留 1 小时，之后需重新填写邮箱和密码。
 
@@ -103,3 +103,11 @@ EMAIL_FROM=Northstar Locate <verify@northstarlocate.com>
 发送后原弹窗会显示六位验证码输入框，重发按钮与下方倒计时逐秒更新；发送失败会保留待验证状态，倒计时结束后可重试，不会跳过验证创建账号。
 
 若 Resend 日志显示 `Invalid from field`，将 Render 的 `EMAIL_FROM` 设为 `verify@northstarlocate.com`，或使用完整格式 `Northstar Locate <verify@northstarlocate.com>`；不要写成姓名加空格再加邮箱。发信失败日志只记录 HTTP 状态和固定错误分类（例如 `EMAIL_FROM_INVALID`），不记录密钥、收件人、验证码或原始响应。
+
+## 语言与密码规则
+
+页面右上角提供中文、English、日本語、한국어、Bahasa Melayu；手机端在菜单内选择。主页、登录注册、验证码提示、付款外层、付款返回页及管理后台共享语言设置，选择会保存在当前浏览器，也可通过 `?lang=en`、`?lang=ja`、`?lang=ko`、`?lang=ms` 分享。语言切换不会清空输入、重置验证码冷却或重建付款。
+
+新注册密码为 6～20 个 Unicode 字符，前后端都会校验；已有账号仍可使用原密码登录。邮件按发送或重发时所选语言生成，邮件模板仅使用已定义的五种语言。Whop 内部结账界面的语言由 Whop 控制，本站的语言切换不会修改 Whop 订阅或价格。
+
+翻译源文件为 `public/locales.json`。修改后运行 `python tools/build-locales.py`，同步生成浏览器使用的 `public/locales.js`。

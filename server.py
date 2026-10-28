@@ -17,6 +17,7 @@ import re
 import secrets
 import sqlite3
 import time
+from html import escape
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -35,6 +36,17 @@ EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 VERIFICATION_TTL = 10 * 60
 VERIFICATION_COOLDOWN = 60
 VERIFICATION_MAX_ATTEMPTS = 5
+MESSAGES = json.loads((PUBLIC_DIR / "locales.json").read_text(encoding="utf-8"))
+
+
+def request_language(header: str) -> str:
+    # Only select supported locale identifiers; never interpolate a path or HTML.
+    for entry in header.split(","):
+        code = entry.split(";", 1)[0].strip().lower().split("-")[0]
+        language = "zh-CN" if code == "zh" else code
+        if language in MESSAGES:
+            return language
+    return "zh-CN"
 
 
 def load_dotenv(path: Path) -> None:
@@ -293,14 +305,16 @@ def email_delivery_error(status: int = 0, provider: Any = None) -> VerificationE
     )
 
 
-def send_verification_email(email: str, code: str, request_id: str) -> None:
+def send_verification_email(email: str, code: str, request_id: str, language: str = "zh-CN") -> None:
     api_key, sender, _ = verification_settings()
+    messages = MESSAGES.get(language, MESSAGES["zh-CN"])
+    intro, expiry, ignore = (messages[key] for key in ("mail.intro", "mail.expiry", "mail.ignore"))
     payload = {
         "from": sender,
         "to": [email],
-        "subject": "Northstar Locate 注册验证码",
-        "text": f"您的 Northstar Locate 注册验证码是：{code}。验证码在 10 分钟内有效，请在注册页面输入。若非本人操作，请忽略此邮件。",
-        "html": f'<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:32px"><h2>Northstar Locate</h2><p>请在注册页面输入以下验证码：</p><p style="font-size:32px;letter-spacing:8px;font-weight:bold">{code}</p><p>验证码在 10 分钟内有效。</p><p>若非本人操作，请忽略此邮件。</p></div>',
+        "subject": messages["mail.subject"],
+        "text": f"{intro}\n{code}\n\n{expiry}\n{ignore}",
+        "html": f'<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:32px"><h2>Northstar Locate</h2><p>{escape(intro)}</p><p style="font-size:32px;letter-spacing:8px;font-weight:bold">{escape(code)}</p><p>{escape(expiry)}</p><p>{escape(ignore)}</p></div>',
     }
     request = Request(
         "https://api.resend.com/emails",
@@ -344,7 +358,7 @@ def verification_response(token: str, email: str, email_sent: bool = True, code_
     return {"verificationRequired": True, "challengeToken": token, "email": email, "expiresIn": VERIFICATION_TTL, "resendAfter": VERIFICATION_COOLDOWN, "emailSent": email_sent, "codeAvailable": code_available}
 
 
-def begin_email_verification(email: str, password: str, requester: str) -> dict[str, Any]:
+def begin_email_verification(email: str, password: str, requester: str, language: str = "zh-CN") -> dict[str, Any]:
     verification_settings()
     token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(token.encode()).hexdigest()
@@ -364,7 +378,7 @@ def begin_email_verification(email: str, password: str, requester: str) -> dict[
             (token_hash, email, password_hash, code_hash, timestamp + VERIFICATION_TTL, timestamp, timestamp),
         )
     try:
-        send_verification_email(email, code, f"registration/{token_hash}/{timestamp}")
+        send_verification_email(email, code, f"registration/{token_hash}/{timestamp}", language)
     except VerificationError as exc:
         # Preserve a retryable challenge, but ready=0 still blocks registration.
         exc.pending = verification_response(token, email, email_sent=False, code_available=False)
@@ -375,7 +389,7 @@ def begin_email_verification(email: str, password: str, requester: str) -> dict[
     return verification_response(token, email)
 
 
-def resend_email_verification(token: str, requester: str) -> dict[str, Any]:
+def resend_email_verification(token: str, requester: str, language: str = "zh-CN") -> dict[str, Any]:
     verification_settings()
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     code = f"{secrets.randbelow(1_000_000):06d}"
@@ -388,7 +402,7 @@ def resend_email_verification(token: str, requester: str) -> dict[str, Any]:
             raise VerificationError(HTTPStatus.BAD_REQUEST, "注册验证已失效，请重新填写邮箱和密码。")
         reserve_email_send(db, row["email"], requester, timestamp)
     try:
-        send_verification_email(row["email"], code, f"registration/{token_hash}/{timestamp}")
+        send_verification_email(row["email"], code, f"registration/{token_hash}/{timestamp}", language)
     except VerificationError as exc:
         # A failed resend must not invalidate a code already delivered earlier.
         exc.pending = verification_response(token, row["email"], email_sent=False, code_available=bool(row["ready"]) and row["expires_at"] > now() and row["attempts"] < VERIFICATION_MAX_ATTEMPTS)
@@ -686,12 +700,12 @@ class Handler(BaseHTTPRequestHandler):
             if len(email) > 254 or not EMAIL_RE.fullmatch(email):
                 self.send_json(HTTPStatus.BAD_REQUEST, {"error": "请输入有效邮箱地址。"})
                 return
-            if not 8 <= len(password) <= 128:
-                self.send_json(HTTPStatus.BAD_REQUEST, {"error": "密码需要 8 至 128 位。"})
+            if not 6 <= len(password) <= 20:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": "密码需要 6 至 20 个字符。"})
                 return
             if email_verification_required():
                 try:
-                    pending = begin_email_verification(email, password, self.verification_requester())
+                    pending = begin_email_verification(email, password, self.verification_requester(), request_language(self.headers.get("Accept-Language", "")))
                 except VerificationError as exc:
                     self.verification_error(exc)
                     return
@@ -720,7 +734,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             try:
                 if parsed.path == "/api/auth/resend-verification":
-                    pending = resend_email_verification(challenge, self.verification_requester())
+                    pending = resend_email_verification(challenge, self.verification_requester(), request_language(self.headers.get("Accept-Language", "")))
                     self.send_json(HTTPStatus.OK, pending)
                 else:
                     user = complete_email_verification(challenge, str(body.get("code", "")).strip())

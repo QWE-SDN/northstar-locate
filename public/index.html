@@ -3,9 +3,11 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Northstar Locate：发送经过同意的手机位置请求。">
-    <title>Northstar Locate | 找到方向</title>
+    <meta name="description" content="Northstar Locate：发送经过同意的手机位置请求。" data-i18n-content="site.description">
+    <title data-i18n="site.title">Northstar Locate · 找到方向</title>
     <script src="https://cdn.whop.com/elements/amber/elements.js" data-whop-elements></script>
+    <script src="/locales.js?v=20261029-1"></script>
+    <script src="/i18n.js?v=20261029-1"></script>
     <style>
       :root {
         color-scheme: light;
@@ -161,89 +163,100 @@
       body.modal-open { overflow: hidden; }
       @media (max-width: 850px) { .hero { grid-template-columns: 1fr; gap: 43px; padding-top: 55px; } .hero-visual { min-height: 360px; } .visual-frame { height: 360px; } .status-card { left: 14px; } .benefit-grid,.steps { grid-template-columns: 1fr; } .consent-band { grid-template-columns: 1fr; } }
       @media (max-width: 620px) { .shell { width: min(100% - 28px, 1160px); } .site-header { min-height: 68px; } .nav { display: none; position: absolute; top: 68px; left: 14px; right: 14px; z-index: 4; flex-direction: column; align-items: stretch; gap: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: 0 15px 30px rgb(20 35 74 / 14%); } .nav.open { display: flex; } .nav a,.nav .language,.nav .account-button,.nav .account-state { padding: 12px 10px; } .account-state { justify-content: space-between; } .menu-toggle { display: block; } .hero { padding: 44px 0 58px; } h1 { font-size: 45px; } .hero-copy { font-size: 16px; } .lookup-form { padding: 5px; } .lookup-form select { width: 98px; font-size: 13px; } .lookup-form input { padding: 11px 9px; font-size: 14px; } .hero-visual,.visual-frame { min-height: 290px; height: 290px; } .status-card { width: 235px; bottom: 15px; } .trust-inner,.footer-inner { align-items: flex-start; flex-direction: column; } section { padding: 70px 0; } .pricing { grid-template-columns: 1fr; } .consent-band { padding: 28px 22px; } }
+      .language { max-width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid #d9e4ef; border-radius: 8px; background: #fff; color: #14234a; font: inherit; font-size: 13px; cursor: pointer; }
+      .language:focus-visible { outline: 3px solid #91b4ff; outline-offset: 2px; }
+      [hidden] { display: none !important; }
+      h1, h2, h3, p, button, summary { overflow-wrap: break-word; }
+      .nav { gap: 16px; }
+      .auth-dialog { max-height: calc(100dvh - 40px); overflow-y: auto; }
+      .hero h1 { line-height: 1.12; }
+      @media (min-width: 621px) and (max-width: 1000px) { .site-header { flex-wrap: wrap; padding-block: 16px; } .nav { width: 100%; justify-content: flex-end; flex-wrap: wrap; } }
     </style>
   </head>
   <body>
     <header class="shell site-header">
-      <a class="brand" href="#top" aria-label="Northstar Locate 首页"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Northstar Locate</span></a>
-      <button class="menu-toggle" type="button" aria-label="打开菜单" aria-expanded="false">☰</button>
-      <nav class="nav" aria-label="主导航">
-        <a href="#how-it-works">工作原理</a>
-        <a href="#pricing">价格</a>
-        <a href="#faq">常见问题</a>
-        <span class="language"><span class="flag">🇭🇰</span> 中文</span>
-        <button class="account-button" id="account-open" type="button">登录 / 注册</button>
-        <span class="account-state" id="account-state" hidden><span class="account-email" id="account-email"></span><button class="account-logout" id="account-logout" type="button">退出</button></span>
+      <a class="brand" href="#top" aria-label="Northstar Locate 首页" data-i18n-aria-label="nav.home"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Northstar Locate</span></a>
+      <button class="menu-toggle" type="button" aria-label="打开菜单" aria-expanded="false" data-i18n-aria-label="nav.menu">☰</button>
+      <nav class="nav" aria-label="主导航" data-i18n-aria-label="nav.main">
+        <a href="#how-it-works"><span data-i18n="nav.how">工作原理</span></a>
+        <a href="#pricing"><span data-i18n="nav.pricing">价格</span></a>
+        <a href="#faq"><span data-i18n="nav.faq">常见问题</span></a>
+        <select class="language" data-language-select data-i18n-aria-label="nav.language" aria-label="选择语言"><option value="zh-CN">Language</option></select>
+        <button class="account-button" id="account-open" type="button"><span data-i18n="nav.account">登录 / 注册</span></button>
+        <span class="account-state" id="account-state" hidden><span class="account-email" id="account-email"></span><button class="account-logout" id="account-logout" type="button"><span data-i18n="nav.logout">退出</span></button></span>
       </nav>
     </header>
 
     <main id="top">
       <section class="shell hero">
         <div>
-          <p class="eyebrow">Northstar Locate / find the next step</p>
-          <h1>找到手机的位置。</h1>
-          <p class="hero-copy">输入号码，创建一份清晰的位置请求。收件人确认后，你才能看到后续结果。</p>
+          <p class="eyebrow"><span data-i18n="site.tagline">Northstar Locate / 找到下一步</span></p>
+          <h1><span data-i18n="hero.title">找到手机的位置。</span></h1>
+          <p class="hero-copy"><span data-i18n="hero.copy">输入号码，创建一份清晰的位置请求。收件人确认后，你才能看到后续结果。</span></p>
           <form class="lookup-form" id="lookup-form">
-            <label class="sr-only" for="country">国家或地区</label>
-            <select id="country" name="country" aria-label="国家或地区">
+            <label class="sr-only" for="country"><span data-i18n="hero.country">国家或地区</span></label>
+            <select id="country" name="country" aria-label="国家或地区" data-i18n-aria-label="hero.country">
               <option value="+852">🇭🇰 +852</option>
               <option value="+86">🇨🇳 +86</option>
               <option value="+1">🇺🇸 +1</option>
               <option value="+44">🇬🇧 +44</option>
               <option value="+61">🇦🇺 +61</option>
+              <option value="+81">🇯🇵 +81</option>
+              <option value="+82">🇰🇷 +82</option>
+              <option value="+60">🇲🇾 +60</option>
             </select>
-            <label class="sr-only" for="phone">手机号码</label>
-            <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="输入要查找的号码" required>
-            <button type="submit" aria-label="创建位置请求">&#8594;</button>
+            <label class="sr-only" for="phone"><span data-i18n="hero.phone">手机号码</span></label>
+            <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="输入要查找的号码" required data-i18n-placeholder="hero.placeholder">
+            <button type="submit" aria-label="创建位置请求" data-i18n-aria-label="hero.submit">&#8594;</button>
           </form>
-          <p class="form-note">我们只会创建请求，不会在对方不知情的情况下获取位置。</p>
-          <div class="result" id="request-result" role="status" aria-live="polite"><strong>请求已准备好</strong><span id="result-copy"></span></div>
+          <p class="form-note"><span data-i18n="hero.note">我们只会创建请求，不会在对方不知情的情况下获取位置。</span></p>
+          <div class="result" id="request-result" role="status" aria-live="polite"><strong><span data-i18n="lookup.ready">请求已准备好</span></strong><span id="result-copy"></span></div>
         </div>
-        <div class="hero-visual" aria-label="Northstar Locate 工作区预览">
-          <div class="visual-frame"><img src="/assets/hero-city.jpg" alt="城市地图与道路的俯瞰图"></div>
-          <div class="status-card"><div class="status-top"><span>位置请求</span><span class="online">在线</span></div><h3>等待对方确认</h3><div class="status-bar"><span></span></div><div class="status-meta"><span>隐私保护</span><strong>100%</strong></div></div>
+        <div class="hero-visual" aria-label="Northstar Locate 工作区预览" data-i18n-aria-label="hero.preview">
+          <div class="visual-frame"><img src="/assets/hero-city.jpg" alt="城市地图与道路的俯瞰图" data-i18n-alt="hero.image"></div>
+          <div class="status-card"><div class="status-top"><span><span data-i18n="hero.request">位置请求</span></span><span class="online"><span data-i18n="hero.online">在线</span></span></div><h3><span data-i18n="hero.waiting">等待对方确认</span></h3><div class="status-bar"><span></span></div><div class="status-meta"><span><span data-i18n="hero.privacy">隐私保护</span></span><strong>100%</strong></div></div>
         </div>
       </section>
 
-      <div class="trust-strip"><div class="shell trust-inner"><span>一个更清楚、更尊重隐私的位置请求工具。</span><div class="trust-items"><span class="trust-item"><span class="trust-icon">✓</span>安全连接</span><span class="trust-item"><span class="trust-icon">◈</span>明确同意</span><span class="trust-item"><span class="trust-icon">◎</span>全球号码</span></div></div></div>
+      <div class="trust-strip"><div class="shell trust-inner"><span><span data-i18n="trust.copy">一个更清楚、更尊重隐私的位置请求工具。</span></span><div class="trust-items"><span class="trust-item"><span class="trust-icon">✓</span><span data-i18n="trust.secure">安全连接</span></span><span class="trust-item"><span class="trust-icon">◈</span><span data-i18n="trust.consent">明确同意</span></span><span class="trust-item"><span class="trust-icon">◎</span><span data-i18n="trust.global">全球号码</span></span></div></div></div>
 
       <section class="shell" id="features">
-        <div class="section-heading"><p class="eyebrow">简单、透明、可控</p><h2>让每一次请求都有清楚的边界。</h2><p>Northstar Locate 用简单的流程整理位置请求，重要的是让收件人知道发生了什么。</p></div>
+        <div class="section-heading"><p class="eyebrow"><span data-i18n="features.eyebrow">简单、透明、可控</span></p><h2><span data-i18n="features.title">让每一次请求都有清楚的边界。</span></h2><p><span data-i18n="features.copy">Northstar Locate 用简单的流程整理位置请求，重要的是让收件人知道发生了什么。</span></p></div>
         <div class="benefit-grid">
-          <article class="benefit-card"><div class="benefit-icon">⌖</div><h3>覆盖常见网络</h3><p>支持多种国家和地区号码格式，先校验输入，再开始请求流程。</p></article>
-          <article class="benefit-card"><div class="benefit-icon">▣</div><h3>收件人确认</h3><p>位置结果只在对方明确同意后继续，避免不透明的静默追踪。</p></article>
-          <article class="benefit-card"><div class="benefit-icon">◌</div><h3>清楚的状态</h3><p>从已创建、等待确认到已完成，每一步都用容易理解的状态展示。</p></article>
+          <article class="benefit-card"><div class="benefit-icon">⌖</div><h3><span data-i18n="features.network.title">覆盖常见网络</span></h3><p><span data-i18n="features.network.copy">支持多种国家和地区号码格式，先校验输入，再开始请求流程。</span></p></article>
+          <article class="benefit-card"><div class="benefit-icon">▣</div><h3><span data-i18n="features.consent.title">收件人确认</span></h3><p><span data-i18n="features.consent.copy">位置结果只在对方明确同意后继续，避免不透明的静默追踪。</span></p></article>
+          <article class="benefit-card"><div class="benefit-icon">◌</div><h3><span data-i18n="features.status.title">清楚的状态</span></h3><p><span data-i18n="features.status.copy">从已创建、等待确认到已完成，每一步都用容易理解的状态展示。</span></p></article>
         </div>
       </section>
 
       <section class="shell" id="how-it-works">
-        <div class="section-heading"><p class="eyebrow">工作原理</p><h2>三步完成一次位置请求。</h2><p>从号码开始，到收件人授权结束，流程保持简单。</p></div>
-        <div class="steps"><article class="step"><span class="step-number">01 / 请求</span><h3>输入号码</h3><p>选择国家或地区，输入要联系的手机号码。</p></article><article class="step"><span class="step-number">02 / 同意</span><h3>收件人确认</h3><p>收件人会看到请求说明，并自行选择是否同意。</p></article><article class="step"><span class="step-number">03 / 结果</span><h3>查看状态</h3><p>收到确认后，回到工作区查看请求状态和后续结果。</p></article></div>
+        <div class="section-heading"><p class="eyebrow"><span data-i18n="nav.how">工作原理</span></p><h2><span data-i18n="how.title">三步完成一次位置请求。</span></h2><p><span data-i18n="how.copy">从号码开始，到收件人授权结束，流程保持简单。</span></p></div>
+        <div class="steps"><article class="step"><span class="step-number"><span data-i18n="how.one">01 / 请求</span></span><h3><span data-i18n="how.one.title">输入号码</span></h3><p><span data-i18n="how.one.copy">选择国家或地区，输入要联系的手机号码。</span></p></article><article class="step"><span class="step-number"><span data-i18n="how.two">02 / 同意</span></span><h3><span data-i18n="features.consent.title">收件人确认</span></h3><p><span data-i18n="how.two.copy">收件人会看到请求说明，并自行选择是否同意。</span></p></article><article class="step"><span class="step-number"><span data-i18n="how.three">03 / 结果</span></span><h3><span data-i18n="how.three.title">查看状态</span></h3><p><span data-i18n="how.three.copy">收到确认后，回到工作区查看请求状态和后续结果。</span></p></article></div>
       </section>
 
       <section class="shell" id="pricing">
-        <div class="section-heading"><p class="eyebrow">价格</p><h2>先从适合你的方式开始。</h2><p>注册或登录后，付款表单会直接在本网站内打开，付款由 Whop 安全处理。</p></div>
-        <div class="pricing"><article class="price-card featured"><span class="price-badge">推荐</span><h3>月度方案</h3><div class="price">$99.00 <small>/ 月</small></div><p class="price-copy">适合需要持续使用请求工作区的用户。</p><ul class="plan-list"><li>更多请求额度</li><li>请求历史记录</li><li>统一工作区</li><li>随时取消</li></ul><button class="plan-button" type="button" data-plan="monthly">选择月度方案</button></article><article class="price-card"><h3>年度方案</h3><div class="price">$199.00 <small>/ 年</small></div><p class="price-copy">适合长期使用请求工作区的用户。</p><ul class="plan-list"><li>年度使用权益</li><li>请求历史记录</li><li>统一工作区</li><li>优先使用</li></ul><button class="plan-button" type="button" data-plan="yearly">选择年度方案</button></article></div>
+        <div class="section-heading"><p class="eyebrow"><span data-i18n="nav.pricing">价格</span></p><h2><span data-i18n="pricing.title">先从适合你的方式开始。</span></h2><p><span data-i18n="pricing.copy">注册或登录后，付款表单会直接在本网站内打开，付款由 Whop 安全处理。</span></p></div>
+        <div class="pricing"><article class="price-card featured"><span class="price-badge"><span data-i18n="pricing.recommended">推荐</span></span><h3><span data-i18n="plan.monthly">月度方案</span></h3><div class="price">$99.00 <small><span data-i18n="plan.perMonth">/ 月</span></small></div><p class="price-copy"><span data-i18n="plan.monthlyCopy">适合需要持续使用请求工作区的用户。</span></p><ul class="plan-list"><li><span data-i18n="plan.more">更多请求额度</span></li><li><span data-i18n="plan.history">请求历史记录</span></li><li><span data-i18n="plan.workspace">统一工作区</span></li><li><span data-i18n="plan.cancel">随时取消</span></li></ul><button class="plan-button" type="button" data-plan="monthly"><span data-i18n="plan.chooseMonthly">选择月度方案</span></button></article><article class="price-card"><h3><span data-i18n="plan.yearly">年度方案</span></h3><div class="price">$199.00 <small><span data-i18n="plan.perYear">/ 年</span></small></div><p class="price-copy"><span data-i18n="plan.yearlyCopy">适合长期使用请求工作区的用户。</span></p><ul class="plan-list"><li><span data-i18n="plan.annualAccess">年度使用权益</span></li><li><span data-i18n="plan.history">请求历史记录</span></li><li><span data-i18n="plan.workspace">统一工作区</span></li><li><span data-i18n="plan.priority">优先使用</span></li></ul><button class="plan-button" type="button" data-plan="yearly"><span data-i18n="plan.chooseYearly">选择年度方案</span></button></article></div>
       </section>
 
-      <section class="shell"><div class="consent-band"><div><p class="eyebrow">隐私优先</p><h2>不隐藏过程，也不替别人做决定。</h2><p>真实的位置服务必须建立在收件人知情和同意的基础上。Northstar Locate 的页面和后续接口都会把这一步放在核心流程里。</p></div><div class="consent-box"><strong>请求状态示例</strong>已创建 → 等待确认 → 对方同意 → 显示可用结果</div></div></section>
+      <section class="shell"><div class="consent-band"><div><p class="eyebrow"><span data-i18n="consent.eyebrow">隐私优先</span></p><h2><span data-i18n="consent.title">不隐藏过程，也不替别人做决定。</span></h2><p><span data-i18n="consent.copy">真实的位置服务必须建立在收件人知情和同意的基础上。Northstar Locate 的页面和后续接口都会把这一步放在核心流程里。</span></p></div><div class="consent-box"><strong><span data-i18n="consent.example">请求状态示例</span></strong><span data-i18n="consent.steps">已创建 → 等待确认 → 对方同意 → 显示可用结果</span></div></div></section>
 
-      <section class="shell" id="faq"><div class="section-heading"><p class="eyebrow">常见问题</p><h2>你可能想先了解这些。</h2></div><div class="faq-list"><details open><summary>只输入电话号码就能直接看到位置吗？</summary><p>不能。号码只能用来创建请求，收件人需要看到说明并主动同意，之后系统才会继续。</p></details><details><summary>支持哪些手机？</summary><p>页面支持常见国家和地区的手机号码格式，真正的短信和位置服务接口将在后续接入后决定实际覆盖范围。</p></details><details><summary>收件人会知道这是位置请求吗？</summary><p>会。正式版本应明确说明请求目的、有效时间和可选的同意或拒绝操作。</p></details><details><summary>付款功能现在可以使用吗？</summary><p>选择价格方案后，Whop Checkout 会在本网站内打开，付款成功后由服务器 Webhook 更新账号订阅状态。</p></details><details><summary>注册需要邮箱验证码吗？</summary><p id="registration-faq">填写邮箱和密码后，按注册页面提示完成邮箱验证。</p></details></div></section>
+      <section class="shell" id="faq"><div class="section-heading"><p class="eyebrow"><span data-i18n="nav.faq">常见问题</span></p><h2><span data-i18n="faq.title">你可能想先了解这些。</span></h2></div><div class="faq-list"><details open><summary><span data-i18n="faq.location">只输入电话号码就能直接看到位置吗？</span></summary><p><span data-i18n="faq.locationAnswer">不能。号码只能用来创建请求，收件人需要看到说明并主动同意，之后系统才会继续。</span></p></details><details><summary><span data-i18n="faq.devices">支持哪些手机？</span></summary><p><span data-i18n="faq.devicesAnswer">页面支持常见国家和地区的手机号码格式，真正的短信和位置服务接口将在后续接入后决定实际覆盖范围。</span></p></details><details><summary><span data-i18n="faq.aware">收件人会知道这是位置请求吗？</span></summary><p><span data-i18n="faq.awareAnswer">会。正式版本应明确说明请求目的、有效时间和可选的同意或拒绝操作。</span></p></details><details><summary><span data-i18n="faq.payment">付款功能现在可以使用吗？</span></summary><p><span data-i18n="faq.paymentAnswer">选择价格方案后，Whop Checkout 会在本网站内打开，付款成功后由服务器 Webhook 更新账号订阅状态。</span></p></details><details><summary><span data-i18n="faq.verification">注册需要邮箱验证码吗？</span></summary><p id="registration-faq"><span data-i18n="faq.verificationDefault">填写邮箱和密码后，按注册页面提示完成邮箱验证。</span></p></details></div></section>
     </main>
 
-    <footer><div class="shell footer-inner"><a class="brand" href="#top"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Northstar Locate</span></a><div class="footer-links"><a href="#how-it-works">工作原理</a><a href="#pricing">价格</a><a href="#faq">常见问题</a><a href="#top">隐私政策</a><a href="#top">服务条款</a></div><span>© 2026 Northstar Locate</span></div></footer>
+    <footer><div class="shell footer-inner"><a class="brand" href="#top"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Northstar Locate</span></a><div class="footer-links"><a href="#how-it-works"><span data-i18n="nav.how">工作原理</span></a><a href="#pricing"><span data-i18n="nav.pricing">价格</span></a><a href="#faq"><span data-i18n="nav.faq">常见问题</span></a><a href="#top"><span data-i18n="footer.privacy">隐私政策</span></a><a href="#top"><span data-i18n="footer.terms">服务条款</span></a></div><span>© 2026 Northstar Locate</span></div></footer>
 
     <div class="payment-modal" id="payment-modal" aria-hidden="true">
       <div class="payment-dialog" role="dialog" aria-modal="true" aria-labelledby="payment-title">
         <div class="payment-header">
           <div>
-            <p class="eyebrow">Whop 安全付款</p>
-            <h2 id="payment-title">准备付款</h2>
-            <p id="payment-summary">付款信息将在此处加载。</p>
+            <p class="eyebrow"><span data-i18n="payment.secure">Whop 安全付款</span></p>
+            <h2 id="payment-title"><span data-i18n="payment.title">准备付款</span></h2>
+            <p id="payment-summary"><span data-i18n="payment.summary">付款信息将在此处加载。</span></p>
           </div>
-          <button class="payment-close" id="payment-close" type="button" aria-label="关闭付款窗口">×</button>
+          <button class="payment-close" id="payment-close" type="button" aria-label="关闭付款窗口" data-i18n-aria-label="payment.close">×</button>
         </div>
-        <div class="payment-loading" id="payment-loading">正在准备安全付款表单…</div>
+        <div class="payment-loading" id="payment-loading"><span data-i18n="payment.loading">正在准备安全付款表单…</span></div>
         <div id="checkout-element" hidden></div>
         <div class="payment-error" id="payment-error" role="alert" aria-live="polite"></div>
       </div>
@@ -251,16 +264,16 @@
 
     <div class="auth-modal" id="auth-modal" aria-hidden="true">
       <div class="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-        <div class="auth-head"><div><p class="eyebrow">Northstar Locate 账号</p><h2 id="auth-title">登录后继续</h2></div><button class="auth-close" id="auth-close" type="button" aria-label="关闭账号窗口">×</button></div>
-        <div class="auth-tabs"><button class="auth-tab active" type="button" data-auth-mode="login">登录</button><button class="auth-tab" type="button" data-auth-mode="register">注册</button></div>
-        <form class="auth-form" id="auth-form">
-          <label>邮箱地址<input id="auth-email" name="email" type="email" autocomplete="email" maxlength="254" required></label>
-          <label id="auth-password-row">密码<input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
-          <label id="auth-code-row" hidden>邮箱验证码<input class="auth-code" id="auth-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" disabled></label>
-          <p class="auth-hint" id="auth-hint">使用已注册的邮箱和密码登录。</p>
-          <button class="auth-submit" id="auth-submit" type="submit">登录</button>
-          <button class="auth-secondary" id="auth-resend" type="button" hidden>重新发送验证码</button>
-          <button class="auth-secondary" id="auth-back" type="button" hidden>修改邮箱或密码</button>
+        <div class="auth-head"><div><p class="eyebrow"><span data-i18n="auth.account">Northstar Locate 账号</span></p><h2 id="auth-title"><span data-i18n="auth.title">登录后继续</span></h2></div><button class="auth-close" id="auth-close" type="button" aria-label="关闭账号窗口" data-i18n-aria-label="auth.close">×</button></div>
+        <div class="auth-tabs"><button class="auth-tab active" type="button" data-auth-mode="login"><span data-i18n="auth.login">登录</span></button><button class="auth-tab" type="button" data-auth-mode="register"><span data-i18n="auth.register">注册</span></button></div>
+        <form class="auth-form" id="auth-form" novalidate>
+          <label><span data-i18n="auth.email">邮箱地址</span><input id="auth-email" name="email" type="email" autocomplete="email" maxlength="254" required></label>
+          <label id="auth-password-row"><span data-i18n="auth.password">密码</span><input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="1" maxlength="128" required></label>
+          <label id="auth-code-row" hidden><span data-i18n="auth.code">邮箱验证码</span><input class="auth-code" id="auth-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" disabled></label>
+          <p class="auth-hint" id="auth-hint"><span data-i18n="auth.loginHint">使用已注册的邮箱和密码登录。</span></p>
+          <button class="auth-submit" id="auth-submit" type="submit"><span data-i18n="auth.login">登录</span></button>
+          <button class="auth-secondary" id="auth-resend" type="button" hidden><span data-i18n="auth.resend">重新发送验证码</span></button>
+          <button class="auth-secondary" id="auth-back" type="button" hidden><span data-i18n="auth.back">修改邮箱或密码</span></button>
           <div class="auth-message" id="auth-message" role="alert" aria-live="polite"></div>
           <p class="auth-message" id="auth-countdown" hidden aria-live="off"></p>
         </form>
@@ -268,6 +281,8 @@
     </div>
 
     <script>
+      const I = window.NorthstarI18n;
+      const t = I.t;
       const menuToggle = document.querySelector('.menu-toggle');
       const nav = document.querySelector('.nav');
       const lookupForm = document.querySelector('#lookup-form');
@@ -309,6 +324,18 @@
       let resendAvailableAt = 0;
       let resendTimer = null;
       let authBusy = false;
+      let activePayment = null;
+
+      function updatePaymentSummary() {
+        if (!activePayment) return;
+        const yearly = activePayment.id === 'yearly';
+        I.set(paymentSummary, 'payment.planSummary', {
+          plan: t(yearly ? 'plan.yearly' : 'plan.monthly'),
+          amount: (Number(activePayment.amount) / 100).toFixed(2),
+          period: t(yearly ? 'plan.perYear' : 'plan.perMonth'),
+        });
+      }
+      I.onChange(() => { updateResendButton(); updatePaymentSummary(); });
 
       menuToggle.addEventListener('click', () => {
         const open = nav.classList.toggle('open');
@@ -320,22 +347,23 @@
         const digits = phone.value.replace(/[^0-9]/g, '');
         if (digits.length < 6) {
           result.classList.add('show');
-          result.querySelector('strong').textContent = '请检查号码';
-          resultCopy.textContent = '请输入至少 6 位数字，再创建位置请求。';
+          I.set(result.querySelector('strong'), 'lookup.invalid');
+          I.set(resultCopy, 'lookup.digits');
           return;
         }
         const masked = digits.length > 4 ? `${digits.slice(0, 2)}••••${digits.slice(-2)}` : digits;
         result.classList.add('show');
-        result.querySelector('strong').textContent = '请求已准备好';
-        resultCopy.textContent = `${country.value} ${masked} 的请求已在本页生成。下一步需要接入短信和收件人同意服务。`;
+        I.set(result.querySelector('strong'), 'lookup.ready');
+        I.set(resultCopy, 'lookup.result', { phone: `${country.value} ${masked}` });
         result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       });
 
       async function requestJson(url, options = {}) {
-        const response = await fetch(url, { credentials: 'same-origin', signal: AbortSignal.timeout(25000), ...options, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } });
+        const response = await fetch(url, { credentials: 'same-origin', signal: AbortSignal.timeout(25000), ...options, headers: { 'Content-Type': 'application/json', 'Accept-Language': I.language, ...(options.headers || {}) } });
         const body = await response.json().catch(() => ({}));
         if (!response.ok) {
-          const error = new Error(body.error || `请求失败（${response.status}）`);
+          const error = new Error(body.error || '');
+          if (!body.error) error.i18nKey = 'error.request';
           error.retryAfter = Number(body.retryAfter) || 0;
           error.status = response.status;
           error.verification = body.verificationRequired && body.challengeToken ? body : null;
@@ -349,7 +377,7 @@
           const config = await requestJson('/api/config', { headers: {} });
           verificationRequired = Boolean(config.registration && config.registration.emailVerificationRequired);
           const answer = document.querySelector('#registration-faq');
-          answer.textContent = verificationRequired ? '需要。填写邮箱和密码后，将收到六位邮箱验证码，验证成功后才能完成注册；验证码 10 分钟有效。' : '注册需要邮箱和至少 8 位密码。';
+          I.set(answer, verificationRequired ? 'faq.verificationYes' : 'faq.verificationNo');
           if (!authBusy && !verification) updateAuthPrompt();
         } catch (error) {
           console.warn('Registration settings unavailable');
@@ -374,8 +402,9 @@
       }
 
       function updateAuthPrompt() {
-        authSubmit.textContent = authMode === 'login' ? '登录' : (verificationRequired ? '发送验证码' : '创建账号');
-        authHint.textContent = authMode === 'login' ? '使用已注册的邮箱和密码登录。' : (verificationRequired ? '输入邮箱和 8 至 128 位密码，接收验证码完成注册。' : '输入邮箱和 8 至 128 位密码创建账号。');
+        I.set(document.querySelector('#auth-title'), authMode === 'login' ? 'auth.title' : 'auth.register');
+        I.set(authSubmit, authMode === 'login' ? 'auth.login' : (verificationRequired ? 'auth.send' : 'auth.create'));
+        I.set(authHint, authMode === 'login' ? 'auth.loginHint' : (verificationRequired ? 'auth.verifyHint' : 'auth.registerHint'));
       }
 
       function setAuthMode(mode) {
@@ -385,11 +414,15 @@
         resendTimer = null;
         resendAvailableAt = 0;
         authCountdown.hidden = true;
-        authCountdown.textContent = '';
+        I.clear(authCountdown);
         authMode = mode;
         authTabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.authMode === mode));
         updateAuthPrompt();
         authPassword.autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+        // Existing accounts retain their original password length at login.
+        authPassword.minLength = mode === 'register' ? 6 : 1;
+        // UTF-16 can use two units per Unicode character; submit validates code points.
+        authPassword.maxLength = mode === 'register' ? 40 : 256;
         authEmail.readOnly = false;
         authPasswordRow.hidden = false;
         authPassword.disabled = false;
@@ -401,7 +434,7 @@
         authCode.value = '';
         authResend.hidden = true;
         authBack.hidden = true;
-        authMessage.textContent = '';
+        I.clear(authMessage);
         updateResendButton();
       }
 
@@ -409,12 +442,13 @@
         const remaining = Math.max(0, Math.ceil((resendAvailableAt - Date.now()) / 1000));
         authResend.disabled = authBusy || remaining > 0;
         authSubmit.disabled = authBusy || (!verification && authMode === 'register' && verificationRequired && remaining > 0);
-        authResend.textContent = remaining > 0 ? `${remaining} 秒后可重新发送` : '重新发送验证码';
+        I.set(authResend, remaining > 0 ? 'auth.resendIn' : 'auth.resend', { seconds: remaining });
         authCountdown.hidden = remaining === 0;
-        authCountdown.textContent = remaining > 0 ? `请等待 ${remaining} 秒后重新发送。` : '';
+        if (remaining > 0) I.set(authCountdown, 'auth.countdown', { seconds: remaining });
+        else I.clear(authCountdown);
         if (!verification && authMode === 'register' && verificationRequired) {
           authSubmit.disabled = authBusy || remaining > 0;
-          authSubmit.textContent = authBusy ? '正在发送…' : (remaining > 0 ? `${remaining} 秒后可重新发送` : '发送验证码');
+          I.set(authSubmit, authBusy ? 'auth.sending' : (remaining > 0 ? 'auth.resendIn' : 'auth.send'), { seconds: remaining });
         }
         if (remaining === 0) {
           window.clearInterval(resendTimer);
@@ -431,9 +465,8 @@
 
       function showAuthError(error, fallback) {
         if (error.verification) showVerification(error.verification);
-        authMessage.textContent = error.status === 429 && error.retryAfter > 0
-          ? '验证码发送过于频繁，请在倒计时结束后重试。'
-          : (error.message || fallback);
+        if (error.status === 429 && error.retryAfter > 0) I.set(authMessage, 'auth.rateLimit');
+        else I.showError(authMessage, error, fallback);
         if (error.retryAfter > 0) startResendCooldown(error.retryAfter);
       }
 
@@ -452,10 +485,11 @@
         if (!keepCode) authCode.value = '';
         authResend.hidden = false;
         authBack.hidden = false;
-        authHint.textContent = body.emailSent === false
-          ? (body.codeAvailable ? '本次重发未成功，之前收到且未过期的验证码仍可使用，也可在倒计时结束后重新发送。' : '邮件尚未发送成功，请在倒计时结束后点击“重新发送验证码”，收到后在上方填写六位验证码。')
-          : `验证码已发送至 ${body.email}，10 分钟内有效；未收到时请检查垃圾邮件。`;
-        authSubmit.textContent = '验证并注册';
+        I.set(authHint, body.emailSent === false
+          ? (body.codeAvailable ? 'auth.resendFailedOld' : 'auth.sendFailedHint')
+          : 'auth.sentHint', { email: body.email });
+        I.set(authSubmit, 'auth.verify');
+        I.set(document.querySelector('#auth-title'), 'auth.code');
         startResendCooldown(body.resendAfter || 60);
         authCode.focus();
       }
@@ -481,7 +515,7 @@
         if (authBusy) return;
         authModal.classList.remove('open');
         authModal.setAttribute('aria-hidden', 'true');
-        authMessage.textContent = '';
+        I.clear(authMessage);
         if (!paymentModal.classList.contains('open')) document.body.classList.remove('modal-open');
       }
 
@@ -489,7 +523,7 @@
         paymentModal.classList.remove('open');
         paymentModal.setAttribute('aria-hidden', 'true');
         document.body.classList.remove('modal-open');
-        paymentError.textContent = '';
+        I.clear(paymentError);
         if (checkoutHandle) {
           checkoutHandle.destroy();
           checkoutHandle = null;
@@ -507,9 +541,9 @@
         paymentModal.setAttribute('aria-hidden', 'false');
         document.body.classList.add('modal-open');
         paymentLoading.hidden = false;
-        paymentLoading.textContent = '正在准备安全付款表单…';
+        I.set(paymentLoading, 'payment.loading');
         checkoutElement.hidden = true;
-        paymentError.textContent = '';
+        I.clear(paymentError);
         if (checkoutHandle) {
           checkoutHandle.destroy();
           checkoutHandle = null;
@@ -519,23 +553,24 @@
           const config = await requestJson('/api/config', { headers: {} });
           const plan = config.plans && config.plans[planId];
           if (!plan || !plan.planId) throw new Error('该付款方案尚未配置。');
-          paymentSummary.textContent = `${plan.productName} · ${plan.label}`;
+          activePayment = { id: planId, amount: plan.amount };
+          updatePaymentSummary();
           if (typeof window.WhopElements !== 'function') throw new Error('付款组件加载失败，请刷新页面后重试。');
           const checkout = await requestJson('/api/whop-checkout-token', { method: 'POST', body: JSON.stringify({ planId }) });
           const whop = window.WhopElements();
           checkoutHandle = whop.checkout.create({
             plan: checkout.planId,
             metadata: { northstar_checkout_token: checkout.token, northstar_email: checkout.email },
-            returnUrl: `${window.location.origin}/return.html?plan=${encodeURIComponent(planId)}`,
+            returnUrl: `${window.location.origin}/return.html?plan=${encodeURIComponent(planId)}&lang=${encodeURIComponent(I.language)}`,
             onComplete: (completion) => {
-              if (completion.result === 'payment') paymentError.textContent = '付款已完成，正在等待服务器确认订阅。';
+              if (completion.result === 'payment') I.set(paymentError, 'payment.complete');
             },
           });
           checkoutElement.hidden = false;
           checkoutHandle.create('checkout').mount('#checkout-element');
           paymentLoading.hidden = true;
         } catch (error) {
-          paymentLoading.textContent = error.message || '付款初始化失败。';
+          I.showError(paymentLoading, error, 'payment.error');
         }
       }
 
@@ -551,12 +586,12 @@
       authResend.addEventListener('click', async () => {
         if (!verification || authBusy || Date.now() < resendAvailableAt) return;
         setAuthBusy(true);
-        authMessage.textContent = '';
+        I.clear(authMessage);
         try {
           const body = await requestJson('/api/auth/resend-verification', { method: 'POST', body: JSON.stringify({ challengeToken: verification.challengeToken }) });
           showVerification(body);
         } catch (error) {
-          showAuthError(error, '验证码发送失败，请稍后重试。');
+          showAuthError(error, 'error.delivery');
         } finally {
           setAuthBusy(false);
         }
@@ -564,8 +599,14 @@
       authForm.addEventListener('submit', async (event) => {
         event.preventDefault();
         if (authBusy || (!verification && authMode === 'register' && Date.now() < resendAvailableAt)) return;
+        if (!authEmail.checkValidity()) { I.set(authMessage, 'error.email'); authEmail.focus(); return; }
+        if (verification && !/^[0-9]{6}$/.test(authCode.value)) { I.set(authMessage, 'error.wrongCode'); authCode.focus(); return; }
+        if (!verification && authMode === 'register' && (Array.from(authPassword.value).length < 6 || Array.from(authPassword.value).length > 20)) {
+          I.set(authMessage, 'error.password');
+          return;
+        }
         setAuthBusy(true);
-        authMessage.textContent = '';
+        I.clear(authMessage);
         try {
           const endpoint = verification ? '/api/auth/verify-email' : (authMode === 'login' ? '/api/auth/login' : '/api/auth/register');
           const payload = verification ? { challengeToken: verification.challengeToken, code: authCode.value } : { email: authEmail.value, password: authPassword.value };
@@ -583,7 +624,7 @@
           authForm.reset();
           if (plan) openPayment(plan);
         } catch (error) {
-          showAuthError(error, '账号操作失败，请重试。');
+          showAuthError(error, 'error.account');
         } finally {
           setAuthBusy(false);
         }

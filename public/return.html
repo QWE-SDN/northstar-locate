@@ -3,7 +3,9 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>付款状态 | Northstar Locate</title>
+    <title data-i18n="return.title">付款状态 · Northstar Locate</title>
+    <script src="/locales.js?v=20261029-1"></script>
+    <script src="/i18n.js?v=20261029-1"></script>
     <style>
       :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #182230; background: #f6f8fb; }
       body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
@@ -12,28 +14,41 @@
       .success { color: #147a4b; }
       .error { color: #b42318; }
       a { color: #2f68f5; }
+      .language { max-width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid #d9e4ef; border-radius: 8px; background: #fff; color: #14234a; font: inherit; font-size: 13px; cursor: pointer; }
+      .language:focus-visible { outline: 3px solid #91b4ff; outline-offset: 2px; }
+      [hidden] { display: none !important; }
+      h1, h2, h3, p, button, summary { overflow-wrap: break-word; }
+      header { flex-wrap: wrap; }
     </style>
   </head>
   <body>
     <main>
-      <h1>付款状态</h1>
-      <p id="status">正在确认付款状态…</p>
-      <p><a href="/">返回 Northstar Locate</a></p>
+      <select class="language" data-language-select data-i18n-aria-label="nav.language" aria-label="选择语言"><option value="zh-CN">Language</option></select>
+      <h1><span data-i18n="return.heading">付款状态</span></h1>
+      <p id="status"><span data-i18n="return.loading">正在确认付款状态…</span></p>
+      <p><a href="/" data-language-link><span data-i18n="return.back">返回 Northstar Locate</span></a></p>
     </main>
     <script>
+      const I = window.NorthstarI18n;
+      const t = I.t;
       const statusNode = document.querySelector('#status');
       const params = new URLSearchParams(window.location.search);
       const paymentId = params.get('payment');
       const status = params.get('status');
 
       if (status === 'succeeded') {
-        statusNode.textContent = paymentId ? `付款成功（${paymentId}），订阅状态将在服务器确认后更新。` : '付款成功，订阅状态将在服务器确认后更新。';
+        I.set(statusNode, 'return.success');
         statusNode.className = 'success';
+        if (paymentId) {
+          const reference = document.createElement('p');
+          I.set(reference, 'return.reference', { id: paymentId });
+          statusNode.after(reference);
+        }
       } else if (status === 'failed' || status === 'canceled') {
-        statusNode.textContent = '付款未完成，没有扣款。请返回价格页面重试。';
+        I.set(statusNode, 'return.failed');
         statusNode.className = 'error';
       } else {
-        statusNode.textContent = '付款仍在处理中，服务器确认后会更新账号状态。';
+        I.set(statusNode, 'return.pending');
       }
     </script>
   </body>
